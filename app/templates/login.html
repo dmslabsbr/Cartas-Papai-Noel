@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Noel{% endblock %}
+
+{% block extra_css %}
+<style>
+  .login-container {
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 2rem;
+    border: 1px solid #e9ecef;
+    border-radius: 0.5rem;
+    background-color: #f8f9fa;
+    margin-top: 2rem;
+  }
+  .error-message {
+    color: #dc3545;
+    margin-bottom: 1rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-container">
+  <h2 class="text-center mb-4">Login</h2>
+  
+  {% if error %}
+  <div class="error-message">
+    {% if error == "invalid_credentials" %}
+      Usuário ou senha inválidos.
+    {% else %}
+      {{ error }}
+    {% endif %}
+  </div>
+  {% endif %}
+  
+  <form method="post" action="/login{% if next %}?next={{ next }}{% endif %}">
+    <div class="mb-3">
+      <label for="username" class="form-label">Email</label>
+      <input type="email" class="form-control" id="username" name="username" required>
+    </div>
+    <div class="mb-3">
+      <label for="password" class="form-label">Senha</label>
+      <input type="password" class="form-control" id="password" name="password" required>
+    </div>
+    <div class="d-grid gap-2">
+      <button type="submit" class="btn btn-primary">Entrar</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

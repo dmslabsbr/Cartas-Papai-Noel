@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Cartinhas - Noel{% endblock %}
+
+{% block extra_css %}
+<style>
+  .carta-card {
+    height: 100%;
+    transition: transform 0.2s;
+  }
+  .carta-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+  }
+  .status-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+  }
+  .carta-nome {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+  .carta-presente {
+    margin-bottom: 0.5rem;
+  }
+  .attachment-indicator {
+    font-size: 0.9rem;
+  }
+  .pagination-info {
+    color: #6c757d;
+    font-size: 0.9rem;
+  }
+  .filters {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1>Cartinhas</h1>
+  
+  <div>
+    {% if "ADMIN" in user.roles|map(attribute="code")|list %}
+    <a href="/cartas/admin" class="btn btn-outline-danger me-2">Administrar</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="filters">
+  <div class="row">
+    <div class="col-md-6">
+      <form action="/cartas" method="get" class="d-flex">
+        <input 
+          type="text" 
+          class="form-control me-2" 
+          name="q" 
+          placeholder="Pesquisar por nome, presente..." 
+          value="{{ q or '' }}"
+        >
+        <button type="submit" class="btn btn-primary">Buscar</button>
+      </form>
+    </div>
+    <div class="col-md-6">
+      <div class="btn-group float-end" role="group">
+        <a href="/cartas" class="btn btn-outline-secondary {% if not status_filter %}active{% endif %}">
+          Todas
+        </a>
+        <a href="/cartas?status=disponivel" class="btn btn-outline-secondary {% if status_filter == 'disponivel' %}active{% endif %}">
+          Disponíveis
+        </a>
+        <a href="/cartas?status=adotadas" class="btn btn-outline-secondary {% if status_filter == 'adotadas' %}active{% endif %}">
+          Adotadas
+        </a>
+        <a href="/cartas?status=entregues" class="btn btn-outline-secondary {% if status_filter == 'entregues' %}active{% endif %}">
+          Presente Entregue
+        </a>
+        {% if user %}
+        <a href="/cartas?status=minhas" class="btn btn-outline-secondary {% if status_filter == 'minhas' %}active{% endif %}">
+          Minhas
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Lista de cartinhas -->
+{% if cartas %}
+<div class="row row-cols-1 row-cols-md-3 g-4">
+  {% for carta in cartas %}
+  <div class="col">
+    <div class="card carta-card h-100">
+      {% if carta.status == "disponível" %}
+      <span class="badge bg-success status-badge">Disponível</span>
+      {% elif carta.status == "adotada" %}
+      <span class="badge bg-primary status-badge">Adotada</span>
+      {% elif carta.status == "entregue" %}
+      <span class="badge bg-info status-badge">Entregue</span>
+      {% else %}
+      <span class="badge bg-secondary status-badge">{{ carta.status }}</span>
+      {% endif %}
+      
+      <div class="card-body">
+        <h5 class="card-title carta-nome">
+          {{ carta.nome }}
+          {% if carta.urlcarta %}
+          <span class="badge rounded-pill text-bg-info ms-2 attachment-indicator" title="Possui anexo">💌</span>
+          {% endif %}
+        </h5>
+        <p class="card-text carta-presente">
+          <strong>Presente:</strong> {{ carta.presente }}
+        </p>
+        <p class="card-text">
+          <small class="text-muted">
+            {{ "Menino" if carta.sexo == "M" else "Menina" }}
+            {% if carta.adotante_email == user.email %}
+            <span class="badge bg-warning text-dark ms-2">Você adotou</span>
+            {% endif %}
+          </small>
+        </p>
+      </div>
+      <div class="card-footer bg-transparent border-top-0">
+        <a href="/cartas/{{ carta.id_carta }}" class="btn btn-sm btn-outline-primary">Ver detalhes</a>
+        {% if carta.urlcarta %}
+        <a href="{{ carta.urlcarta }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-info ms-2">Ver imagem</a>
+        {% endif %}
+        
+        {% if carta.status == "disponível" %}
+        <form method="post" action="/cartas/adopt/{{ carta.id_carta }}" class="d-inline adopt-form">
+          <button type="submit" class="btn btn-sm btn-success">Adotar</button>
+        </form>
+        {% elif carta.adotante_email == user.email and (not carta.entregue_bl) and carta.status != "entregue" %}
+        <form method="post" action="/cartas/cancel/{{ carta.id_carta }}" class="d-inline cancel-form">
+          <button type="submit" class="btn btn-sm btn-warning">Cancelar adoção</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Paginação -->
+<div class="d-flex justify-content-between align-items-center mt-4">
+  <div class="pagination-info">
+    Mostrando {{ (pagination.page - 1) * pagination.per_page + 1 }} a 
+    {{ [pagination.page * pagination.per_page, pagination.total]|min }} 
+    de {{ pagination.total }} cartinhas
+  </div>
+  
+  <nav aria-label="Navegação de páginas">
+    <ul class="pagination">
+      <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+        <a class="page-link" href="/cartas?page={{ pagination.page - 1 }}{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+          Anterior
+        </a>
+      </li>
+      
+      {% set start = pagination.page - 2 %}
+      {% if start < 1 %}{% set start = 1 %}{% endif %}
+      {% set end = pagination.page + 2 %}
+      {% if end > pagination.total_pages %}{% set end = pagination.total_pages %}{% endif %}
+      {% if start > end %}{% set start = end %}{% endif %}
+      
+      {% for p in range(start, end + 1) %}
+      <li class="page-item {% if p == pagination.page %}active{% endif %}">
+        <a class="page-link" href="/cartas?page={{ p }}{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+          {{ p }}
+        </a>
+      </li>
+      {% endfor %}
+      
+      <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+        <a class="page-link" href="/cartas?page={{ pagination.page + 1 }}{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+          Próxima
+        </a>
+      </li>
+    </ul>
+  </nav>
+</div>
+
+<!-- Modal de confirmação de adoção -->
+<div class="modal fade" id="confirmAdoptModal" tabindex="-1" aria-labelledby="confirmAdoptLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmAdoptLabel">Confirmar adoção</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        Você deseja realmente adotar esta cartinha?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success" id="confirmAdoptBtn">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="alert alert-info">
+  Nenhuma cartinha encontrada.
+  {% if q %}
+  <a href="/cartas" class="alert-link">Limpar pesquisa</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    let pendingForm = null;
+    const adoptModalEl = document.getElementById('confirmAdoptModal');
+    const adoptConfirmBtn = document.getElementById('confirmAdoptBtn');
+
+    document.querySelectorAll('form.adopt-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        pendingForm = form;
+        const modal = new bootstrap.Modal(adoptModalEl);
+        modal.show();
+      });
+    });
+
+    adoptConfirmBtn.addEventListener('click', function () {
+      if (pendingForm) {
+        const modal = bootstrap.Modal.getInstance(adoptModalEl);
+        modal.hide();
+        pendingForm.submit();
+        pendingForm = null;
+      }
+    });
+  });
+</script>
+{% endblock %}

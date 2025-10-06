@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Cartinha {{ carta.nome }} - Noel{% endblock %}
+
+{% block extra_css %}
+<style>
+  .carta-header {
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    margin-bottom: 2rem;
+  }
+  .carta-info {
+    background-color: #fff;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  }
+  .carta-actions {
+    margin-top: 2rem;
+  }
+  .carta-status {
+    font-size: 1.1rem;
+  }
+  .carta-section {
+    margin-bottom: 1.5rem;
+  }
+  .carta-label {
+    font-weight: bold;
+    color: #6c757d;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="carta-header">
+  <div class="d-flex justify-content-between align-items-center">
+    <h1>Cartinha #{{ carta.id_carta }}</h1>
+    <a href="/cartas" class="btn btn-outline-secondary">Voltar para Lista</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-8">
+    <div class="carta-info">
+      <div class="carta-section">
+        <h2>{{ carta.nome }}</h2>
+        <p class="carta-status">
+          {% if carta.status == "disponível" %}
+          <span class="badge bg-success">Disponível</span>
+          {% elif carta.status == "adotada" %}
+          <span class="badge bg-primary">Adotada</span>
+          {% elif carta.status == "entregue" %}
+          <span class="badge bg-info">Entregue</span>
+          {% else %}
+          <span class="badge bg-secondary">{{ carta.status }}</span>
+          {% endif %}
+          
+          <span class="ms-2">{{ "Menino" if carta.sexo == "M" else "Menina" }}</span>
+          {% if carta.urlcarta %}
+          <span class="badge rounded-pill text-bg-info ms-2">Possui anexo</span>
+          {% endif %}
+        </p>
+      </div>
+      
+      <div class="carta-section">
+        <p class="carta-label">Presente desejado:</p>
+        <p class="fs-5">{{ carta.presente }}</p>
+      </div>
+      
+      {% if carta.observacao %}
+      <div class="carta-section">
+        <p class="carta-label">Observações:</p>
+        <p>{{ carta.observacao }}</p>
+      </div>
+      {% endif %}
+
+      {% if carta.urlcarta %}
+      <div class="carta-section">
+        <p class="carta-label">Anexo:</p>
+        <p>
+          <a href="{{ carta.urlcarta }}" target="_blank" rel="noopener" class="btn btn-outline-info btn-sm">Abrir anexo</a>
+        </p>
+      </div>
+      {% endif %}
+      
+      {% if carta.adotante_email %}
+      <div class="carta-section">
+        <p class="carta-label">Adotado por:</p>
+        <p>
+          {{ carta.adotante_email }}
+          {% if carta.adotante_email == user.email %}
+          <span class="badge bg-warning text-dark ms-2">Você</span>
+          {% endif %}
+        </p>
+      </div>
+      {% endif %}
+      
+      <div class="carta-actions">
+        {% if carta.status == "disponível" %}
+        <form method="post" action="/cartas/adopt/{{ carta.id_carta }}" class="d-inline adopt-form">
+          <button type="submit" class="btn btn-success">Adotar esta cartinha</button>
+        </form>
+        {% elif carta.adotante_email == user.email %}
+        <form method="post" action="/cartas/cancel/{{ carta.id_carta }}" class="d-inline cancel-form">
+          <button type="submit" class="btn btn-warning">Cancelar minha adoção</button>
+        </form>
+        {% endif %}
+        
+        {% if is_admin and carta.adotante_email %}
+        <form method="post" action="/cartas/release/{{ carta.id_carta }}" class="d-inline release-form ms-2">
+          <button type="submit" class="btn btn-outline-danger">Liberar cartinha (ADMIN)</button>
+        </form>
+        {% endif %}
+        
+        {% if is_admin %}
+        <button 
+          type="button" 
+          class="btn btn-primary ms-2" 
+          data-bs-toggle="modal" 
+          data-bs-target="#editCartaModal"
+        >
+          Editar
+        </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">Informações</h5>
+      </div>
+      <div class="card-body">
+        <p><strong>ID:</strong> {{ carta.id_carta }}</p>
+        <p><strong>Criado em:</strong> {{ carta.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+        <p><strong>Atualizado em:</strong> {{ carta.updated_at.strftime('%d/%m/%Y %H:%M') }}</p>
+        
+        {% if is_admin %}
+        <hr>
+        <h6>Informações administrativas</h6>
+        <p><strong>ID interno:</strong> {{ carta.id }}</p>
+        {% if carta.del_bl %}
+        <p class="text-danger"><strong>Excluído:</strong> Sim</p>
+        <p><strong>Data de exclusão:</strong> {{ carta.del_time.strftime('%d/%m/%Y %H:%M') }}</p>
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal confirmação de adoção -->
+<div class="modal fade" id="confirmAdoptModal" tabindex="-1" aria-labelledby="confirmAdoptLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmAdoptLabel">Confirmar adoção</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">Você deseja realmente adotar esta cartinha?</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success" id="confirmAdoptBtn">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal confirmação de cancelamento -->
+<div class="modal fade" id="confirmCancelModal" tabindex="-1" aria-labelledby="confirmCancelLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmCancelLabel">Confirmar cancelamento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">Você deseja realmente cancelar a adoção desta cartinha?</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Não</button>
+        <button type="button" class="btn btn-warning" id="confirmCancelBtn">Sim, cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal confirmação de liberação (ADMIN) -->
+<div class="modal fade" id="confirmReleaseModal" tabindex="-1" aria-labelledby="confirmReleaseLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmReleaseLabel">Confirmar liberação</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">Tem certeza que deseja liberar esta cartinha? Esta ação removerá a adoção atual.</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="confirmReleaseBtn">Liberar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if is_admin %}
+<!-- Modal para editar cartinha (apenas para administradores) -->
+<div class="modal fade" id="editCartaModal" tabindex="-1" aria-labelledby="editCartaModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editCartaModalLabel">Editar Cartinha</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <form id="editCartaForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="edit_nome" class="form-label">Nome</label>
+            <input type="text" class="form-control" id="edit_nome" name="nome" value="{{ carta.nome }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Sexo</label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="sexo" id="edit_sexo_m" value="M" {% if carta.sexo == "M" %}checked{% endif %}>
+              <label class="form-check-label" for="edit_sexo_m">Masculino</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="sexo" id="edit_sexo_f" value="F" {% if carta.sexo == "F" %}checked{% endif %}>
+              <label class="form-check-label" for="edit_sexo_f">Feminino</label>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="edit_presente" class="form-label">Presente</label>
+            <input type="text" class="form-control" id="edit_presente" name="presente" value="{{ carta.presente }}" required>
+          </div>
+          <div class="mb-3">
+            <label for="edit_status" class="form-label">Status</label>
+            <select class="form-select" id="edit_status" name="status" required>
+              <option value="disponível" {% if carta.status == "disponível" %}selected{% endif %}>Disponível</option>
+              <option value="adotada" {% if carta.status == "adotada" %}selected{% endif %}>Adotada</option>
+              <option value="entregue" {% if carta.status == "entregue" %}selected{% endif %}>Entregue</option>
+              <option value="cancelada" {% if carta.status == "cancelada" %}selected{% endif %}>Cancelada</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="edit_observacao" class="form-label">Observação</label>
+            <textarea class="form-control" id="edit_observacao" name="observacao" rows="3">{{ carta.observacao or "" }}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Atualizar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Confirmação de adoção
+    let pendingAdoptForm = null;
+    const adoptModalEl = document.getElementById('confirmAdoptModal');
+    const adoptConfirmBtn = document.getElementById('confirmAdoptBtn');
+    document.querySelectorAll('form.adopt-form').forEach(function(form) {
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        pendingAdoptForm = form;
+        const modal = new bootstrap.Modal(adoptModalEl);
+        modal.show();
+      });
+    });
+    adoptConfirmBtn && adoptConfirmBtn.addEventListener('click', function () {
+      if (pendingAdoptForm) {
+        const modal = bootstrap.Modal.getInstance(adoptModalEl);
+        modal && modal.hide();
+        pendingAdoptForm.submit();
+        pendingAdoptForm = null;
+      }
+    });
+
+    // Confirmação de cancelamento
+    let pendingCancelForm = null;
+    const cancelModalEl = document.getElementById('confirmCancelModal');
+    const cancelConfirmBtn = document.getElementById('confirmCancelBtn');
+    document.querySelectorAll('form.cancel-form').forEach(function(form) {
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        pendingCancelForm = form;
+        const modal = new bootstrap.Modal(cancelModalEl);
+        modal.show();
+      });
+    });
+    cancelConfirmBtn && cancelConfirmBtn.addEventListener('click', function () {
+      if (pendingCancelForm) {
+        const modal = bootstrap.Modal.getInstance(cancelModalEl);
+        modal && modal.hide();
+        pendingCancelForm.submit();
+        pendingCancelForm = null;
+      }
+    });
+
+    // Confirmação de liberação (ADMIN)
+    let pendingReleaseForm = null;
+    const releaseModalEl = document.getElementById('confirmReleaseModal');
+    const releaseConfirmBtn = document.getElementById('confirmReleaseBtn');
+    document.querySelectorAll('form.release-form').forEach(function(form) {
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        pendingReleaseForm = form;
+        const modal = new bootstrap.Modal(releaseModalEl);
+        modal.show();
+      });
+    });
+    releaseConfirmBtn && releaseConfirmBtn.addEventListener('click', function () {
+      if (pendingReleaseForm) {
+        const modal = bootstrap.Modal.getInstance(releaseModalEl);
+        modal && modal.hide();
+        pendingReleaseForm.submit();
+        pendingReleaseForm = null;
+      }
+    });
+  });
+</script>
+{% if is_admin %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Enviar formulário de edição via API
+    document.getElementById('editCartaForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+      
+      const formData = new FormData(this);
+      const data = Object.fromEntries(formData.entries());
+      
+      fetch(`/cartas/api/admin/{{ carta.id_carta }}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Erro ao atualizar cartinha');
+        }
+        return response.json();
+      })
+      .then(data => {
+        // Fechar o modal e recarregar a página
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editCartaModal'));
+        modal.hide();
+        window.location.reload();
+      })
+      .catch(error => {
+        alert('Erro ao atualizar cartinha: ' + error.message);
+      });
+    });
+  });
+</script>
+{% endif %}
+{% endblock %}

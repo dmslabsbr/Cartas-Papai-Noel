@@ -1,0 +1,720 @@
+{% extends "base.html" %}
+
+{% block title %}Administração de Cartinhas - Noel{% endblock %}
+
+{% block extra_css %}
+<style>
+  .admin-header {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+    padding: 1rem;
+    margin-bottom: 2rem;
+    border-radius: 0.25rem;
+  }
+  .table-responsive {
+    margin-top: 1.5rem;
+  }
+  .deleted-row {
+    background-color: #f8d7da;
+    text-decoration: line-through;
+    opacity: 0.7;
+  }
+  .pagination-info {
+    color: #6c757d;
+    font-size: 0.9rem;
+  }
+  .toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1080;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+  <div class="d-flex justify-content-between align-items-center">
+    <h1>Administração de Cartinhas</h1>
+    <div class="d-flex gap-2">
+      <a href="/relatorios/" class="btn btn-outline-info">Relatórios</a>
+      <a href="/cartas" class="btn btn-outline-dark">Voltar para Cartinhas</a>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-container">
+  <div id="globalToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body" id="globalToastBody">Ação concluída.</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Filtros e ações -->
+<div class="row mb-4">
+  <div class="col-md-6">
+    <form action="/cartas/admin" method="get" class="d-flex">
+      <input 
+        type="text" 
+        class="form-control me-2" 
+        name="q" 
+        placeholder="Pesquisar cartinhas..." 
+        value="{{ q or '' }}"
+      >
+      <button type="submit" class="btn btn-primary">Buscar</button>
+    </form>
+  </div>
+  <div class="col-md-6 text-end">
+    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addCartaModal">
+      Nova Cartinha
+    </button>
+  </div>
+</div>
+
+<!-- Tabela de cartinhas -->
+<div class="table-responsive">
+  <table class="table table-striped table-hover">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Nome</th>
+        <th>Sexo</th>
+        <th>Presente</th>
+        <th>Status</th>
+        <th>Adotante</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for carta in cartas %}
+      <tr class="{% if carta.del_bl %}deleted-row{% endif %}">
+        <td>{{ carta.id_carta }}</td>
+        <td>{{ carta.nome }}</td>
+        <td>{{ "M" if carta.sexo == "M" else "F" }}</td>
+        <td>{{ carta.presente }}</td>
+        <td>
+          {% if carta.status == "disponível" %}
+          <span class="badge bg-success">Disponível</span>
+          {% elif carta.status == "adotada" %}
+          <span class="badge bg-primary">Adotada</span>
+          {% elif carta.status == "entregue" %}
+          <span class="badge bg-info">Entregue</span>
+          {% else %}
+          <span class="badge bg-secondary">{{ carta.status }}</span>
+          {% endif %}
+          {% if carta.urlcarta %}
+          <span class="ms-2" title="Possui anexo">💌</span>
+          {% endif %}
+        </td>
+        <td>{{ carta.adotante_email or "-" }}</td>
+        <td>
+          <div class="btn-group btn-group-sm">
+            <a href="/cartas/{{ carta.id_carta }}" class="btn btn-outline-primary">Ver</a>
+            <button 
+              type="button" 
+              class="btn btn-outline-secondary edit-btn" 
+              data-bs-toggle="modal" 
+              data-bs-target="#editCartaModal"
+              data-id="{{ carta.id }}"
+              data-id-carta="{{ carta.id_carta }}"
+              data-nome="{{ carta.nome }}"
+              data-sexo="{{ carta.sexo }}"
+              data-presente="{{ carta.presente }}"
+              data-status="{{ carta.status }}"
+              data-observacao="{{ carta.observacao or '' }}"
+              data-urlcarta="{{ carta.urlcarta or '' }}"
+            >
+              Editar
+            </button>
+            {% if not carta.del_bl %}
+            <button 
+              type="button" 
+              class="btn btn-outline-danger delete-btn" 
+              data-bs-toggle="modal" 
+              data-bs-target="#deleteCartaModal"
+              data-id-carta="{{ carta.id_carta }}"
+              data-nome="{{ carta.nome }}"
+            >
+              Excluir
+            </button>
+            {% endif %}
+            {% if carta.adotante_email %}
+            <button
+              type="button"
+              class="btn btn-outline-danger release-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#releaseCartaModal"
+              data-id-carta="{{ carta.id_carta }}"
+            >
+              Liberar
+            </button>
+            {% endif %}
+            <button
+              type="button"
+              class="btn btn-outline-success deliver-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#deliverCartaModal"
+              data-id-carta="{{ carta.id_carta }}"
+              {% if not (carta.status == "adotada") %}disabled{% endif %}
+            >
+              Marcar entregue
+            </button>
+            {% if carta.status == "entregue" %}
+            <button
+              type="button"
+              class="btn btn-outline-warning undeliver-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#undeliverCartaModal"
+              data-id-carta="{{ carta.id_carta }}"
+            >
+              Desmarcar entregue
+            </button>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Paginação -->
+<div class="d-flex justify-content-between align-items-center mt-4">
+  <div class="pagination-info">
+    Mostrando {{ (pagination.page - 1) * pagination.per_page + 1 }} a 
+    {{ [pagination.page * pagination.per_page, pagination.total]|min }} 
+    de {{ pagination.total }} cartinhas
+  </div>
+  
+  <nav aria-label="Navegação de páginas">
+    <ul class="pagination">
+      <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+        <a class="page-link" href="/cartas/admin?page={{ pagination.page - 1 }}{% if q %}&q={{ q }}{% endif %}">
+          Anterior
+        </a>
+      </li>
+      
+      {% set start = pagination.page - 2 %}
+      {% if start < 1 %}{% set start = 1 %}{% endif %}
+      {% set end = pagination.page + 2 %}
+      {% if end > pagination.total_pages %}{% set end = pagination.total_pages %}{% endif %}
+      {% if start > end %}{% set start = end %}{% endif %}
+      
+      {% for p in range(start, end + 1) %}
+      <li class="page-item {% if p == pagination.page %}active{% endif %}">
+        <a class="page-link" href="/cartas/admin?page={{ p }}{% if q %}&q={{ q }}{% endif %}">
+          {{ p }}
+        </a>
+      </li>
+      {% endfor %}
+      
+      <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+        <a class="page-link" href="/cartas/admin?page={{ pagination.page + 1 }}{% if q %}&q={{ q }}{% endif %}">
+          Próxima
+        </a>
+      </li>
+    </ul>
+  </nav>
+</div>
+
+<!-- Modal para adicionar cartinha -->
+<div class="modal fade" id="addCartaModal" tabindex="-1" aria-labelledby="addCartaModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addCartaModalLabel">Nova Cartinha</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <form id="addCartaForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="nome" class="form-label">Nome da Criança</label>
+            <input type="text" class="form-control" id="nome" name="nome" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Sexo</label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="sexo" id="sexo_m" value="M" checked>
+              <label class="form-check-label" for="sexo_m">Masculino</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="sexo" id="sexo_f" value="F">
+              <label class="form-check-label" for="sexo_f">Feminino</label>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="presente" class="form-label">Presente</label>
+            <input type="text" class="form-control" id="presente" name="presente" required>
+          </div>
+          <div class="mb-3">
+            <label for="observacao" class="form-label">Observação</label>
+            <textarea class="form-control" id="observacao" name="observacao" rows="3"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="anexo" class="form-label">Anexo (PDF/Imagem)</label>
+            <input type="file" class="form-control" id="anexo" name="anexo" accept="application/pdf,image/*">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para editar cartinha -->
+<div class="modal fade" id="editCartaModal" tabindex="-1" aria-labelledby="editCartaModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editCartaModalLabel">Editar Cartinha</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <form id="editCartaForm">
+        <div class="modal-body">
+          <input type="hidden" id="edit_id" name="id">
+          <input type="hidden" id="edit_id_carta" name="id_carta">
+          
+          <div class="mb-3">
+            <label for="edit_nome" class="form-label">Nome da Criança</label>
+            <input type="text" class="form-control" id="edit_nome" name="nome" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Sexo</label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="sexo" id="edit_sexo_m" value="M">
+              <label class="form-check-label" for="edit_sexo_m">Masculino</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="sexo" id="edit_sexo_f" value="F">
+              <label class="form-check-label" for="edit_sexo_f">Feminino</label>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="edit_presente" class="form-label">Presente</label>
+            <input type="text" class="form-control" id="edit_presente" name="presente" required>
+          </div>
+          <div class="mb-3">
+            <label for="edit_status" class="form-label">Status</label>
+            <select class="form-select" id="edit_status" name="status" required>
+              <option value="disponível">Disponível</option>
+              <option value="adotada">Adotada</option>
+              <option value="entregue">Entregue</option>
+              <option value="cancelada">Cancelada</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="edit_observacao" class="form-label">Observação</label>
+            <textarea class="form-control" id="edit_observacao" name="observacao" rows="3"></textarea>
+          </div>
+          <!-- Campo de anexo para edição -->
+          <div class="mb-2" id="edit_anexo_current_wrap" style="display:none;">
+            <span class="text-muted">Anexo atual:</span>
+            <a id="edit_anexo_current_link" href="#" target="_blank" rel="noopener" class="btn btn-outline-info btn-sm ms-2">Ver imagem</a>
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" value="1" id="edit_remove_anexo">
+              <label class="form-check-label" for="edit_remove_anexo">
+                Remover anexo (não apaga do servidor)
+              </label>
+            </div>
+          </div>
+          <div class="mb-1">
+            <label for="edit_anexo" class="form-label">Anexo (PDF/Imagem)</label>
+            <input type="file" class="form-control" id="edit_anexo" name="anexo" accept="application/pdf,image/*">
+          </div>
+          <div class="form-text">Se você enviar um novo arquivo, ele substituirá o anexo atual.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Atualizar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para excluir cartinha -->
+<div class="modal fade" id="deleteCartaModal" tabindex="-1" aria-labelledby="deleteCartaModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteCartaModalLabel">Confirmar Exclusão</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p>Tem certeza que deseja excluir a cartinha <strong id="delete_carta_nome"></strong>?</p>
+        <p class="text-danger">Esta ação não pode ser desfeita.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form id="deleteCartaForm" method="post">
+          <button type="submit" class="btn btn-danger">Excluir</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal confirmar liberação (ADMIN) -->
+<div class="modal fade" id="releaseCartaModal" tabindex="-1" aria-labelledby="releaseCartaModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="releaseCartaModalLabel">Liberar cartinha</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        Tem certeza que deseja liberar esta cartinha? A adoção atual será removida.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form id="releaseCartaForm" method="post">
+          <button type="submit" class="btn btn-danger">Liberar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal confirmar entrega (ADMIN) -->
+<div class="modal fade" id="deliverCartaModal" tabindex="-1" aria-labelledby="deliverCartaModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deliverCartaModalLabel">Marcar como entregue</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        Confirmar entrega do presente desta cartinha?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form id="deliverCartaForm" method="post">
+          <button type="submit" class="btn btn-success">Confirmar entrega</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal confirmar desmarcar entrega (ADMIN) -->
+<div class="modal fade" id="undeliverCartaModal" tabindex="-1" aria-labelledby="undeliverCartaModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="undeliverCartaModalLabel">Desmarcar entregue</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        Deseja realmente desmarcar a entrega desta cartinha? O status voltará para "adotada".
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form id="undeliverCartaForm" method="post">
+          <button type="submit" class="btn btn-warning">Desmarcar entregue</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    function showToast(message, variant) {
+      const toastEl = document.getElementById('globalToast');
+      const toastBody = document.getElementById('globalToastBody');
+      if (!toastEl || !toastBody) return;
+      toastBody.textContent = message || 'Ação concluída.';
+      toastEl.classList.remove('text-bg-success','text-bg-danger','text-bg-warning','text-bg-info');
+      toastEl.classList.add(variant || 'text-bg-success');
+      const toast = new bootstrap.Toast(toastEl, { delay: 2000 });
+      toast.show();
+      return toast;
+    }
+
+    function isAllowedFile(file) {
+      if (!file) return true;
+      const allowed = ['application/pdf','image/jpeg','image/png','image/webp'];
+      if (!file.type) return false;
+      return allowed.includes(file.type);
+    }
+
+    // Configurar modal de edição
+    const editModal = document.getElementById('editCartaModal');
+    if (editModal) {
+      editModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const id = button.getAttribute('data-id');
+        const idCarta = button.getAttribute('data-id-carta');
+        const nome = button.getAttribute('data-nome');
+        const sexo = button.getAttribute('data-sexo');
+        const presente = button.getAttribute('data-presente');
+        const status = button.getAttribute('data-status');
+        const observacao = button.getAttribute('data-observacao');
+        const urlcarta = button.getAttribute('data-urlcarta') || '';
+        
+        // Preencher o formulário
+        document.getElementById('edit_id').value = id;
+        document.getElementById('edit_id_carta').value = idCarta;
+        document.getElementById('edit_nome').value = nome;
+        document.getElementById('edit_presente').value = presente;
+        document.getElementById('edit_status').value = status;
+        document.getElementById('edit_observacao').value = observacao;
+        
+        // Selecionar o sexo
+        if (sexo === 'M') {
+          document.getElementById('edit_sexo_m').checked = true;
+        } else {
+          document.getElementById('edit_sexo_f').checked = true;
+        }
+
+        // Reset do input de arquivo
+        const fileInput = document.getElementById('edit_anexo');
+        if (fileInput) fileInput.value = '';
+
+        // Mostrar/ocultar info do anexo atual
+        const wrap = document.getElementById('edit_anexo_current_wrap');
+        const link = document.getElementById('edit_anexo_current_link');
+        if (urlcarta) {
+          if (wrap) wrap.style.display = '';
+          if (link) link.href = urlcarta;
+        } else {
+          if (wrap) wrap.style.display = 'none';
+          if (link) link.removeAttribute('href');
+        }
+      });
+    }
+    
+    // Configurar modal de exclusão
+    const deleteModal = document.getElementById('deleteCartaModal');
+    if (deleteModal) {
+      deleteModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const idCarta = button.getAttribute('data-id-carta');
+        const nome = button.getAttribute('data-nome');
+        
+        // Atualizar o texto de confirmação
+        document.getElementById('delete_carta_nome').textContent = `${nome} (ID: ${idCarta})`;
+        
+        // Configurar o formulário de exclusão
+        document.getElementById('deleteCartaForm').action = `/cartas/api/admin/${idCarta}`;
+      });
+    }
+
+    // Configurar modal de liberação (ADMIN)
+    const releaseModal = document.getElementById('releaseCartaModal');
+    if (releaseModal) {
+      releaseModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const idCarta = button.getAttribute('data-id-carta');
+        document.getElementById('releaseCartaForm').action = `/cartas/release/${idCarta}`;
+      });
+    }
+
+    // Configurar modal de entrega (ADMIN)
+    const deliverModal = document.getElementById('deliverCartaModal');
+    if (deliverModal) {
+      deliverModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const idCarta = button.getAttribute('data-id-carta');
+        document.getElementById('deliverCartaForm').action = `/cartas/deliver/${idCarta}`;
+      });
+    }
+
+    // Configurar modal de desmarcar entrega (ADMIN)
+    const undeliverModal = document.getElementById('undeliverCartaModal');
+    if (undeliverModal) {
+      undeliverModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const idCarta = button.getAttribute('data-id-carta');
+        document.getElementById('undeliverCartaForm').action = `/cartas/undeliver/${idCarta}`;
+      });
+    }
+    
+    // Enviar formulário de adição via API e, se houver, subir anexo
+    document.getElementById('addCartaForm').addEventListener('submit', async function(event) {
+      event.preventDefault();
+      const formEl = this;
+      const fileInput = document.getElementById('anexo');
+
+      // Validação de tipo no cliente
+      if (fileInput && fileInput.files && fileInput.files[0] && !isAllowedFile(fileInput.files[0])) {
+        showToast('Arquivo inválido. Envie PDF ou imagem (JPEG/PNG/WEBP).', 'text-bg-danger');
+        return;
+      }
+
+      // Monta payload JSON da cartinha
+      const data = {
+        nome: document.getElementById('nome').value,
+        sexo: formEl.querySelector('input[name="sexo"]:checked').value,
+        presente: document.getElementById('presente').value,
+        observacao: document.getElementById('observacao').value || null,
+      };
+
+      try {
+        console.log('[Admin] Criando cartinha...', data);
+        // 1) Cria cartinha
+        const createResp = await fetch('/cartas/api/admin/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+          credentials: 'same-origin',
+        });
+        console.log('[Admin] Resposta criação status=', createResp.status);
+        if (!createResp.ok) throw new Error('Erro ao criar cartinha');
+        const created = await createResp.json();
+        console.log('[Admin] Cartinha criada', created);
+
+        // 2) Se houver arquivo, faz upload multipart
+        if (fileInput.files && fileInput.files[0]) {
+          console.log('[Admin] Enviando anexo (create) id_carta=', created.id_carta, 'filename=', fileInput.files[0].name, 'type=', fileInput.files[0].type);
+          const formData = new FormData();
+          formData.append('file', fileInput.files[0]);
+          const uploadResp = await fetch(`/cartas/api/admin/${created.id_carta}/anexo`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+          });
+          console.log('[Admin] Resposta upload (create) status=', uploadResp.status);
+          if (!uploadResp.ok) {
+            const errText = await uploadResp.text();
+            console.error('[Admin] Falha upload (create):', errText);
+            throw new Error('Erro ao enviar anexo');
+          }
+          await uploadResp.json();
+        }
+
+        showToast('Cartinha criada com sucesso!', 'text-bg-success');
+        // Fechar o modal e recarregar após breve atraso
+        setTimeout(() => {
+          const modal = bootstrap.Modal.getInstance(document.getElementById('addCartaModal'));
+          modal && modal.hide();
+          window.location.reload();
+        }, 800);
+      } catch (err) {
+        console.error('[Admin] Erro ao salvar (create):', err);
+        showToast(err.message || 'Erro ao salvar cartinha', 'text-bg-danger');
+      }
+    });
+    
+    // Enviar formulário de edição via API
+    document.getElementById('editCartaForm').addEventListener('submit', async function(event) {
+      event.preventDefault();
+
+      const formEl = this;
+      const formData = new FormData(formEl);
+      const idCartaHidden = document.getElementById('edit_id_carta');
+      const idCarta = idCartaHidden && 'value' in idCartaHidden ? idCartaHidden.value : formData.get('id_carta');
+      const fileInput = document.getElementById('edit_anexo');
+      const removeCheck = document.getElementById('edit_remove_anexo');
+
+      // Validação de tipo no cliente
+      if (fileInput && fileInput.files && fileInput.files[0]) {
+        const allowed = ['application/pdf','image/jpeg','image/png','image/webp'];
+        if (!allowed.includes(fileInput.files[0].type)) {
+          const toastEl = document.getElementById('globalToast');
+          const toastBody = document.getElementById('globalToastBody');
+          if (toastBody) toastBody.textContent = 'Arquivo inválido. Envie PDF ou imagem (JPEG/PNG/WEBP).';
+          if (toastEl) new bootstrap.Toast(toastEl, { delay: 2000 }).show();
+          return;
+        }
+      }
+
+      // Remover campos que não devem ser enviados
+      formData.delete('id');
+      formData.delete('id_carta');
+      // Remover arquivo do payload JSON
+      formData.delete('anexo');
+
+      const data = Object.fromEntries(formData.entries());
+
+      // Se marcado remover, enviar urlcarta=null
+      if (removeCheck && removeCheck.checked) {
+        data.urlcarta = null;
+      }
+
+      try {
+        const resp = await fetch(`/cartas/api/admin/${idCarta}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+          credentials: 'same-origin',
+        });
+        if (!resp.ok) {
+          throw new Error('Erro ao atualizar cartinha');
+        }
+        await resp.json();
+
+        // Se houver arquivo e não for remoção, faz upload multipart (substitui referência)
+        if (fileInput && fileInput.files && fileInput.files[0]) {
+          const fd = new FormData();
+          fd.append('file', fileInput.files[0]);
+          const uploadResp = await fetch(`/cartas/api/admin/${idCarta}/anexo`, {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin',
+          });
+          if (!uploadResp.ok) {
+            const errText = await uploadResp.text();
+            console.error('[Admin] Falha upload (edit):', errText);
+            throw new Error('Erro ao enviar anexo');
+          }
+          await uploadResp.json();
+        }
+
+        const toastEl = document.getElementById('globalToast');
+        const toastBody = document.getElementById('globalToastBody');
+        if (toastBody) toastBody.textContent = 'Cartinha atualizada com sucesso!';
+        if (toastEl) new bootstrap.Toast(toastEl, { delay: 1200 }).show();
+        setTimeout(() => {
+          const modal = bootstrap.Modal.getInstance(document.getElementById('editCartaModal'));
+          modal && modal.hide();
+          window.location.reload();
+        }, 800);
+      } catch (error) {
+        const toastEl = document.getElementById('globalToast');
+        const toastBody = document.getElementById('globalToastBody');
+        if (toastBody) toastBody.textContent = 'Erro ao atualizar cartinha: ' + (error.message || 'Erro desconhecido');
+        if (toastEl) new bootstrap.Toast(toastEl, { delay: 2000 }).show();
+      }
+    });
+    
+    // Enviar formulário de exclusão via API
+    document.getElementById('deleteCartaForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+      
+      const action = this.action;
+      
+      fetch(action, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Erro ao excluir cartinha');
+        }
+        return response.json();
+      })
+      .then(data => {
+        showToast('Cartinha excluída com sucesso!', 'text-bg-success');
+        const modal = bootstrap.Modal.getInstance(document.getElementById('deleteCartaModal'));
+        modal && modal.hide();
+        setTimeout(() => window.location.reload(), 800);
+      })
+      .catch(error => {
+        showToast('Erro ao excluir cartinha: ' + error.message, 'text-bg-danger');
+      });
+    });
+  });
+</script>
+{% endblock %}
