@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Permissões{% endblock %}
+
+{% block page_header %}
+{% with header_title="Permissões", header_subtitle="Consulta de roles e referência de uso" %}
+  {% include "_header.html" %}
+{% endwith %}
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="/admin" class="btn btn-outline-secondary">Voltar</a>
+  <hr>
+</div>
+
+<div class="card">
+  <div class="card-header">Roles cadastradas</div>
+  <div class="card-body">
+    <ul id="rolesList"></ul>
+  </div>
+ </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', async function () {
+    const ul = document.getElementById('rolesList');
+    const r = await fetch('/permissoes/roles');
+    if (!r.ok) { ul.innerHTML = '<li>Erro ao carregar roles.</li>'; return; }
+    const data = await r.json();
+    ul.innerHTML = data.map(x => `<li><code>${x.code}</code> - ${x.description || ''}</li>`).join('');
+  });
+</script>
+{% endblock %}
+
+

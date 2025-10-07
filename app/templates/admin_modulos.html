@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Módulos{% endblock %}
+
+{% block page_header %}
+{% with header_title="Módulos", header_subtitle="Gerenciamento de módulos" %}
+  {% include "_header.html" %}
+{% endwith %}
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="/admin" class="btn btn-outline-secondary">Voltar</a>
+  <button class="btn btn-success ms-2" id="btnNovo">Novo módulo</button>
+  <hr>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-striped align-middle" id="tblModulos">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Nome</th>
+        <th class="text-end">Ações</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- Modal Novo/Editar -->
+<div class="modal fade" id="moduloModal" tabindex="-1" aria-labelledby="moduloLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="moduloLabel">Módulo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <form id="formModulo">
+        <div class="modal-body">
+          <input type="hidden" id="md_id">
+          <div class="mb-3">
+            <label class="form-label" for="md_nome">Nome</label>
+            <input type="text" class="form-control" id="md_nome" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+  <div id="modToast" class="toast text-bg-success" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body" id="modToastBody">Ação concluída.</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', async function () {
+    const tbl = document.querySelector('#tblModulos tbody');
+    const toastEl = document.getElementById('modToast');
+    const toastBody = document.getElementById('modToastBody');
+    const modalEl = document.getElementById('moduloModal');
+    const modal = new bootstrap.Modal(modalEl);
+
+    function showToast(msg, klass) {
+      if (klass) toastEl.className = 'toast ' + klass;
+      toastBody.textContent = msg;
+      new bootstrap.Toast(toastEl, { delay: 1200 }).show();
+    }
+
+    async function carregar() {
+      const r = await fetch('/modulos/');
+      if (!r.ok) { tbl.innerHTML = '<tr><td colspan="3">Erro ao carregar módulos.</td></tr>'; return; }
+      const data = await r.json();
+      tbl.innerHTML = data.map(m => `<tr>
+        <td>${m.id_modulo}</td>
+        <td>${m.nome}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-primary btnEdit" data-id="${m.id_modulo}" data-nome="${m.nome}">Editar</button>
+          <button class="btn btn-sm btn-outline-danger btnDel" data-id="${m.id_modulo}">Excluir</button>
+        </td>
+      </tr>`).join('');
+
+      tbl.querySelectorAll('.btnEdit').forEach(el => {
+        el.addEventListener('click', function () {
+          document.getElementById('md_id').value = this.getAttribute('data-id');
+          document.getElementById('md_nome').value = this.getAttribute('data-nome');
+          modal.show();
+        });
+      });
+      tbl.querySelectorAll('.btnDel').forEach(el => {
+        el.addEventListener('click', async function () {
+          if (!confirm('Excluir módulo?')) return;
+          const id = this.getAttribute('data-id');
+          const r = await fetch(`/modulos/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          if (!r.ok) { showToast('Falha ao excluir', 'text-bg-danger'); return; }
+          showToast('Excluído');
+          carregar();
+        });
+      });
+    }
+
+    document.getElementById('btnNovo').addEventListener('click', () => {
+      document.getElementById('md_id').value = '';
+      document.getElementById('md_nome').value = '';
+      modal.show();
+    });
+
+    document.getElementById('formModulo').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const id = document.getElementById('md_id').value.trim();
+      const nome = document.getElementById('md_nome').value.trim();
+      if (!nome) { showToast('Informe o nome', 'text-bg-danger'); return; }
+      if (id) {
+        const r = await fetch(`/modulos/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome }) });
+        if (!r.ok) { showToast('Falha ao atualizar', 'text-bg-danger'); return; }
+        showToast('Atualizado');
+      } else {
+        const r = await fetch('/modulos/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome }) });
+        if (!r.ok) { showToast('Falha ao criar', 'text-bg-danger'); return; }
+        showToast('Criado');
+      }
+      modal.hide();
+      carregar();
+    });
+
+    carregar();
+  });
+</script>
+{% endblock %}
+
+

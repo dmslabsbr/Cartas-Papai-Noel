@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Relatório - Anexos referenciados{% endblock %}
+
+{% block page_header %}
+{% with header_title="Anexos referenciados", header_subtitle="Arquivos no bucket que estão vinculados a cartinhas ativas" %}
+  {% include "_header.html" %}
+{% endwith %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <a href="/relatorios/" class="btn btn-outline-secondary">Voltar aos Relatórios</a>
+  <div></div>
+  <div></div>
+  <div></div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    Itens listados a partir do bucket de anexos (cartas/*) que possuem correspondência em cartinhas ativas
+  </div>
+  <div class="card-body">
+    {% if anexos_referenciados %}
+    <div class="table-responsive">
+      <table class="table table-striped table-hover">
+        <thead>
+          <tr>
+            <th>Objeto</th>
+            <th>Tamanho (bytes)</th>
+            <th>Modificado em</th>
+            <th class="text-end">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in anexos_referenciados %}
+          <tr>
+            <td class="text-break">{{ item.object_name }}</td>
+            <td>{{ item.size }}</td>
+            <td>{{ item.last_modified }}</td>
+            <td class="text-end">
+              <button type="button" class="btn btn-sm btn-outline-info me-2 btn-view" data-object="{{ item.object_name }}" title="Visualizar">📺</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="alert alert-secondary mb-0">Nenhum anexo referenciado encontrado.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Toast reutilizável -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+  <div id="relToast" class="toast text-bg-success" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body" id="relToastBody">Ação concluída.</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+    </div>
+  </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    function showToast(msg, klass) {
+      const el = document.getElementById('relToast');
+      const body = document.getElementById('relToastBody');
+      if (klass) el.className = 'toast ' + klass;
+      if (body) body.textContent = msg;
+      if (el) new bootstrap.Toast(el, { delay: 1500 }).show();
+    }
+
+    document.querySelectorAll('.btn-view').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const objectName = this.getAttribute('data-object');
+        try {
+          const resp = await fetch(`/relatorios/api/object-url?object_name=${encodeURIComponent(objectName)}`);
+          if (!resp.ok) throw new Error('Falha ao obter URL');
+          const data = await resp.json();
+          window.open(data.url, '_blank', 'noopener');
+        } catch (e) {
+          showToast('Não foi possível abrir o anexo', 'text-bg-danger');
+        }
+      });
+    });
+  });
+</script>
+{% endblock %}
+
+

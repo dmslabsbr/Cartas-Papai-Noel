@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Usuários{% endblock %}
+
+{% block page_header %}
+{% with header_title="Usuários", header_subtitle="Gerenciamento de usuários e roles" %}
+  {% include "_header.html" %}
+{% endwith %}
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="/admin" class="btn btn-outline-secondary">Voltar</a>
+  <a href="/relatorios/" class="btn btn-outline-info ms-2">Relatórios</a>
+  <button class="btn btn-outline-primary ms-2" id="btnReload">Recarregar</button>
+  <button class="btn btn-success ms-2" id="btnNovo">Novo usuário</button>
+  <div class="form-check form-check-inline ms-3">
+    <input class="form-check-input" type="checkbox" id="ckAtivos" checked>
+    <label class="form-check-label" for="ckAtivos">Somente ativos</label>
+  </div>
+  <div class="input-group mt-2" style="max-width: 420px;">
+    <span class="input-group-text">Buscar</span>
+    <input id="q" type="text" class="form-control" placeholder="Nome ou email">
+    <button class="btn btn-outline-secondary" id="btnBuscar">Buscar</button>
+  </div>
+  <div class="small text-muted mt-1">Use a busca para filtrar por nome/email; marque/desmarque "Somente ativos".</div>
+  <hr>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-striped align-middle" id="tblUsuarios">
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>Nome</th>
+        <th>Ativo</th>
+        <th>Roles</th>
+        <th class="text-end">Ações</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div class="text-muted small" id="usuariosInfo"></div>
+  <nav class="mt-2">
+    <ul class="pagination" id="paginacao"></ul>
+  </nav>
+  <hr>
+  <div>
+    <h6>Roles disponíveis</h6>
+    <ul id="rolesLista" class="small"></ul>
+  </div>
+</div>
+
+<!-- Modal Novo Usuário -->
+<div class="modal fade" id="novoUsuarioModal" tabindex="-1" aria-labelledby="novoUsuarioLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="novoUsuarioLabel">Novo Usuário</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <form id="formNovoUsuario">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" for="nu_email">Email</label>
+            <input type="email" class="form-control" id="nu_email" name="email" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="nu_display">Nome</label>
+            <input type="text" class="form-control" id="nu_display" name="display_name" required>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="nu_ativo" name="bl_ativo" checked>
+            <label class="form-check-label" for="nu_ativo">Ativo</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="nu_roles">Roles (opcional)</label>
+            <select id="nu_roles" class="form-select" multiple>
+            </select>
+            <div class="form-text">Segure Ctrl/Cmd para múltiplas.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Criar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+ </div>
+
+<!-- Toast -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+  <div id="adminToast" class="toast text-bg-success" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body" id="adminToastBody">Ação concluída.</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', async function () {
+    const tbl = document.querySelector('#tblUsuarios tbody');
+    const info = document.getElementById('usuariosInfo');
+    const pag = document.getElementById('paginacao');
+    const toastEl = document.getElementById('adminToast');
+    const toastBody = document.getElementById('adminToastBody');
+    const rolesUl = document.getElementById('rolesLista');
+
+    let page = 1, perPage = 20, total = 0;
+    let rolesDisponiveis = [];
+
+    function showToast(msg, klass) {
+      if (klass) toastEl.className = 'toast ' + klass;
+      toastBody.textContent = msg;
+      new bootstrap.Toast(toastEl, { delay: 1200 }).show();
+    }
+
+    async function carregarRoles() {
+      const r = await fetch('/usuarios/roles');
+      if (r.ok) {
+        rolesDisponiveis = await r.json();
+        rolesUl.innerHTML = rolesDisponiveis.map(x => `<li><code>${x.code}</code> - ${x.description || ''}</li>`).join('');
+        // preencher select do modal
+        const sel = document.getElementById('nu_roles');
+        if (sel) sel.innerHTML = rolesDisponiveis.map(x => `<option value="${x.code}">${x.code}</option>`).join('');
+      }
+    }
+
+    async function carregarUsuarios() {
+      const ativo = document.getElementById('ckAtivos').checked;
+      const q = document.getElementById('q').value.trim();
+      const skip = (page - 1) * perPage;
+      const params = new URLSearchParams();
+      if (ativo) params.set('ativo', 'true');
+      if (q) params.set('q', q);
+      params.set('skip', String(skip));
+      params.set('limit', String(perPage));
+      const r = await fetch('/usuarios?' + params.toString());
+      if (!r.ok) { tbl.innerHTML = '<tr><td colspan="5">Erro ao carregar usuários.</td></tr>'; return; }
+      const data = await r.json();
+      total = skip + data.length; // aproximado
+      info.textContent = `Exibindo ${data.length} usuários`;
+      tbl.innerHTML = data.map(u => {
+        const ativoCheck = u.bl_ativo ? 'checked' : '';
+        const roles = (u.roles || []).map(r => `<span class="badge text-bg-secondary me-1">${r}</span>`).join('');
+        return `<tr>
+          <td class="text-break">${u.email}</td>
+          <td>${u.display_name}</td>
+          <td><input type="checkbox" class="form-check-input ckAtivo" data-email="${u.email}" ${ativoCheck}></td>
+          <td>${roles}</td>
+          <td class="text-end">
+            <div class="btn-group btn-group-sm">
+              ${rolesDisponiveis.map(r => `<button class="btn btn-outline-primary btnAddRole" data-email="${u.email}" data-role="${r.code}">+${r.code}</button>`).join('')}
+            </div>
+            <div class="btn-group btn-group-sm mt-1">
+              ${(u.roles || []).map(r => `<button class="btn btn-outline-danger btnDelRole" data-email="${u.email}" data-role="${r}">-${r}</button>`).join('')}
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+
+      // listeners
+      tbl.querySelectorAll('.ckAtivo').forEach(el => {
+        el.addEventListener('change', async function () {
+          const email = this.getAttribute('data-email');
+          const r = await fetch(`/usuarios/${encodeURIComponent(email)}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bl_ativo: this.checked })
+          });
+          if (!r.ok) { showToast('Falha ao atualizar ativo', 'text-bg-danger'); this.checked = !this.checked; return; }
+          showToast('Usuário atualizado');
+        });
+      });
+      tbl.querySelectorAll('.btnAddRole').forEach(el => {
+        el.addEventListener('click', async function () {
+          const email = this.getAttribute('data-email');
+          const role = this.getAttribute('data-role');
+          const r = await fetch(`/usuarios/${encodeURIComponent(email)}/roles/${encodeURIComponent(role)}`, { method: 'POST' });
+          if (!r.ok) { showToast('Falha ao atribuir role', 'text-bg-danger'); return; }
+          showToast('Role atribuída');
+          carregarUsuarios();
+        });
+      });
+      tbl.querySelectorAll('.btnDelRole').forEach(el => {
+        el.addEventListener('click', async function () {
+          const email = this.getAttribute('data-email');
+          const role = this.getAttribute('data-role');
+          const r = await fetch(`/usuarios/${encodeURIComponent(email)}/roles/${encodeURIComponent(role)}`, { method: 'DELETE' });
+          if (!r.ok) { showToast('Falha ao remover role', 'text-bg-danger'); return; }
+          showToast('Role removida');
+          carregarUsuarios();
+        });
+      });
+    }
+
+    document.getElementById('btnReload').addEventListener('click', () => { carregarUsuarios(); });
+    document.getElementById('btnBuscar').addEventListener('click', () => { page = 1; carregarUsuarios(); });
+    document.getElementById('ckAtivos').addEventListener('change', () => { page = 1; carregarUsuarios(); });
+
+    // Novo usuário
+    const novoModalEl = document.getElementById('novoUsuarioModal');
+    const novoModal = new bootstrap.Modal(novoModalEl);
+    document.getElementById('btnNovo').addEventListener('click', () => { novoModal.show(); });
+    document.getElementById('formNovoUsuario').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const email = document.getElementById('nu_email').value.trim();
+      const display = document.getElementById('nu_display').value.trim();
+      const ativo = document.getElementById('nu_ativo').checked;
+      const rolesSel = Array.from(document.getElementById('nu_roles').selectedOptions).map(o => o.value);
+      if (!email || !display) { showToast('Preencha email e nome', 'text-bg-danger'); return; }
+      const r = await fetch('/usuarios/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, display_name: display, bl_ativo: ativo, roles: rolesSel }) });
+      if (!r.ok) { showToast('Falha ao criar usuário', 'text-bg-danger'); return; }
+      showToast('Usuário criado');
+      novoModal.hide();
+      carregarUsuarios();
+    });
+
+    await carregarRoles();
+    await carregarUsuarios();
+  });
+</script>
+{% endblock %}
+
+

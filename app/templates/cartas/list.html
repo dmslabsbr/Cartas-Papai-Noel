@@ -91,6 +91,7 @@
 </div>
 
 <!-- Lista de cartinhas -->
+{% set palette = ['text-danger','text-success','text-primary'] %}
 {% if cartas %}
 <div class="row row-cols-1 row-cols-md-3 g-4">
   {% for carta in cartas %}
@@ -115,10 +116,26 @@
         </h5>
         <p class="card-text carta-presente">
           <strong>Presente:</strong> {{ carta.presente }}
+          <span class="ms-2 align-middle">
+            <i class="fa-solid 
+            fa-gift text-secondary me-1" title="gift"></i>
+            {% if icons_by_id %}
+              {% set icons = icons_by_id.get(carta.id_carta) %}
+              {% if icons %}
+                {% for icon_code in icons %}
+                  {% set color = palette[(loop.index0) % 3] %}
+                  <i class="fa-solid fa-{{ icon_code }} {{ color }} me-1" title="{{ icon_code }}"></i>
+                {% endfor %}
+              {% endif %}
+            {% endif %}
+          </span>
         </p>
         <p class="card-text">
           <small class="text-muted">
             {{ "Menino" if carta.sexo == "M" else "Menina" }}
+            {% if carta.idade is not none %}
+              &nbsp;–&nbsp;{{ carta.idade }} {{ 'ano' if carta.idade == 1 else 'anos' }}
+            {% endif %}
             {% if carta.adotante_email == user.email %}
             <span class="badge bg-warning text-dark ms-2">Você adotou</span>
             {% endif %}
@@ -128,7 +145,7 @@
       <div class="card-footer bg-transparent border-top-0">
         <a href="/cartas/{{ carta.id_carta }}" class="btn btn-sm btn-outline-primary">Ver detalhes</a>
         {% if carta.urlcarta %}
-        <a href="{{ carta.urlcarta }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-info ms-2">Ver imagem</a>
+        <a href="/cartas/anexo/{{ carta.id_carta }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-info ms-2">Ver imagem</a>
         {% endif %}
         
         {% if carta.status == "disponível" %}
@@ -204,6 +221,25 @@
   </div>
 </div>
 
+<!-- Modal de confirmação de cancelamento de adoção -->
+<div class="modal fade" id="confirmCancelModal" tabindex="-1" aria-labelledby="confirmCancelLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmCancelLabel">Confirmar cancelamento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        Você deseja realmente cancelar a adoção desta cartinha?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Não</button>
+        <button type="button" class="btn btn-warning" id="confirmCancelBtn">Sim, cancelar</button>
+      </div>
+    </div>
+  </div>
+  </div>
+
 {% else %}
 <div class="alert alert-info">
   Nenhuma cartinha encontrada.
@@ -220,6 +256,8 @@
     let pendingForm = null;
     const adoptModalEl = document.getElementById('confirmAdoptModal');
     const adoptConfirmBtn = document.getElementById('confirmAdoptBtn');
+    const cancelModalEl = document.getElementById('confirmCancelModal');
+    const cancelConfirmBtn = document.getElementById('confirmCancelBtn');
 
     document.querySelectorAll('form.adopt-form').forEach(function (form) {
       form.addEventListener('submit', function (e) {
@@ -233,6 +271,24 @@
     adoptConfirmBtn.addEventListener('click', function () {
       if (pendingForm) {
         const modal = bootstrap.Modal.getInstance(adoptModalEl);
+        modal.hide();
+        pendingForm.submit();
+        pendingForm = null;
+      }
+    });
+
+    // Cancelar adoção (confirmação)
+    document.querySelectorAll('form.cancel-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        pendingForm = form;
+        const modal = new bootstrap.Modal(cancelModalEl);
+        modal.show();
+      });
+    });
+    cancelConfirmBtn.addEventListener('click', function () {
+      if (pendingForm) {
+        const modal = bootstrap.Modal.getInstance(cancelModalEl);
         modal.hide();
         pendingForm.submit();
         pendingForm = null;

@@ -33,12 +33,17 @@
 </style>
 {% endblock %}
 
+{% block page_header %}
+{% include "_header.html" with context %}
+{% endblock %}
+
 {% block content %}
 <div class="admin-header">
   <div class="d-flex justify-content-between align-items-center">
     <h1>Administração de Cartinhas</h1>
     <div class="d-flex gap-2">
       <a href="/relatorios/" class="btn btn-outline-info">Relatórios</a>
+      <a href="/cartas/admin/miniaturas" class="btn btn-outline-primary">Gerar miniaturas</a>
       <a href="/cartas" class="btn btn-outline-dark">Voltar para Cartinhas</a>
     </div>
   </div>
@@ -124,6 +129,7 @@
               data-nome="{{ carta.nome }}"
               data-sexo="{{ carta.sexo }}"
               data-presente="{{ carta.presente }}"
+              data-idade="{{ carta.idade or 0 }}"
               data-status="{{ carta.status }}"
               data-observacao="{{ carta.observacao or '' }}"
               data-urlcarta="{{ carta.urlcarta or '' }}"
@@ -251,6 +257,14 @@
             <input type="text" class="form-control" id="presente" name="presente" required>
           </div>
           <div class="mb-3">
+            <label for="idade" class="form-label">Idade</label>
+            <select class="form-select" id="idade" name="idade">
+              {% for n in range(0, 16) %}
+              <option value="{{ n }}">{{ n }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
             <label for="observacao" class="form-label">Observação</label>
             <textarea class="form-control" id="observacao" name="observacao" rows="3"></textarea>
           </div>
@@ -299,6 +313,14 @@
           <div class="mb-3">
             <label for="edit_presente" class="form-label">Presente</label>
             <input type="text" class="form-control" id="edit_presente" name="presente" required>
+          </div>
+          <div class="mb-3">
+            <label for="edit_idade" class="form-label">Idade</label>
+            <select class="form-select" id="edit_idade" name="idade">
+              {% for n in range(0, 16) %}
+              <option value="{{ n }}">{{ n }}</option>
+              {% endfor %}
+            </select>
           </div>
           <div class="mb-3">
             <label for="edit_status" class="form-label">Status</label>
@@ -457,6 +479,7 @@
         const nome = button.getAttribute('data-nome');
         const sexo = button.getAttribute('data-sexo');
         const presente = button.getAttribute('data-presente');
+        const idade = button.getAttribute('data-idade');
         const status = button.getAttribute('data-status');
         const observacao = button.getAttribute('data-observacao');
         const urlcarta = button.getAttribute('data-urlcarta') || '';
@@ -467,6 +490,10 @@
         document.getElementById('edit_nome').value = nome;
         document.getElementById('edit_presente').value = presente;
         document.getElementById('edit_status').value = status;
+        if (idade !== null && idade !== undefined) {
+          const sel = document.getElementById('edit_idade');
+          if (sel) sel.value = idade;
+        }
         document.getElementById('edit_observacao').value = observacao;
         
         // Selecionar o sexo
@@ -556,6 +583,7 @@
         nome: document.getElementById('nome').value,
         sexo: formEl.querySelector('input[name="sexo"]:checked').value,
         presente: document.getElementById('presente').value,
+        idade: parseInt(document.getElementById('idade').value, 10),
         observacao: document.getElementById('observacao').value || null,
       };
 
@@ -635,6 +663,9 @@
       formData.delete('anexo');
 
       const data = Object.fromEntries(formData.entries());
+      if (data.idade !== undefined) {
+        data.idade = data.idade === '' ? null : parseInt(data.idade, 10);
+      }
 
       // Se marcado remover, enviar urlcarta=null
       if (removeCheck && removeCheck.checked) {

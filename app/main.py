@@ -22,7 +22,8 @@ from .db import get_db
 from .middleware import AuthMiddleware
 from .services import AuthService
 from .dependencies import get_current_user, require_roles
-from .routers import cartas_router, relatorios_router
+from .routers import cartas_router, relatorios_router, usuarios_router, modulos_router, permissoes_router
+from .utils.template_helpers import first_name_from_user
 
 
 def read_version() -> str:
@@ -46,8 +47,15 @@ app = FastAPI(
 
 # Configurar diretórios de templates e arquivos estáticos
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
-# Disponibilizar versão globalmente nos templates (widget reutilizável)
+# Em desenvolvimento, garantir recarregamento automático de templates
+if get_settings().environment == "development":
+    try:
+        templates.env.auto_reload = True
+    except Exception:
+        pass
+# Disponibilizar versão e helpers globalmente nos templates (widget reutilizável)
 templates.env.globals["app_version"] = APP_VERSION
+templates.env.globals["first_name_from_user"] = first_name_from_user
 static_dir = Path(__file__).resolve().parent / "static"
 static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
@@ -75,9 +83,24 @@ app.add_middleware(
     max_age=SETTINGS.session_max_age
 )
 
+# Em desenvolvimento, evitar cache para respostas HTML para refletir mudanças imediatamente
+@app.middleware("http")
+async def _no_cache_html_in_dev(request: Request, call_next):
+    response = await call_next(request)
+    if SETTINGS.environment == "development":
+        content_type = response.headers.get("content-type", "")
+        if "text/html" in content_type:
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+    return response
+
 # Incluir routers
 app.include_router(cartas_router)
 app.include_router(relatorios_router)
+app.include_router(usuarios_router)
+app.include_router(modulos_router)
+app.include_router(permissoes_router)
 
 @app.on_event("startup")
 async def _log_version_on_startup() -> None:
@@ -384,6 +407,50 @@ async def admin_page(
     """Página de administração (protegida, apenas para administradores)."""
     return templates.TemplateResponse(
         "admin.html", 
+        {"request": request, "version": APP_VERSION, "user": user}
+    )
+
+
+@app.get("/admin/usuarios", response_class=HTMLResponse)
+async def admin_usuarios_page(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_roles(["ADMIN"]))
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        "admin_usuarios.html",
+        {"request": request, "version": APP_VERSION, "user": user}
+    )
+
+
+@app.get("/admin/modulos", response_class=HTMLResponse)
+async def admin_modulos_page(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_roles(["ADMIN"]))
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        "admin_modulos.html",
+        {"request": request, "version": APP_VERSION, "user": user}
+    )
+
+
+@app.get("/admin/permissoes", response_class=HTMLResponse)
+async def admin_permissoes_page(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_roles(["ADMIN"]))
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        "admin_permissoes.html",
+        {"request": request, "version": APP_VERSION, "user": user}
+    )
+
+
+@app.get("/admin/sistema", response_class=HTMLResponse)
+async def admin_sistema_page(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_roles(["ADMIN"]))
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        "relatorios/index.html",
         {"request": request, "version": APP_VERSION, "user": user}
     )
 

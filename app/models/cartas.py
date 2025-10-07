@@ -34,8 +34,12 @@ class CartaDiversa(Base):
     status = Column(Text, nullable=False)
     observacao = Column(Text, nullable=True)
     adotante_email = Column(Text, ForeignKey("public.usuarios.email"), nullable=True)
-    # URL pública do anexo (PDF/Imagem)
+    # URL pública do anexo (PDF/Imagem) ou object_name
     urlcarta = Column(Text, nullable=True)
+    # URL/object_name da miniatura gerada (200x300)
+    urlcarta_pq = Column(Text, nullable=True)
+    # Idade da criança (opcional)
+    idade = Column(Integer, nullable=True)
     del_bl = Column(Boolean, nullable=False, default=False)
     del_time = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

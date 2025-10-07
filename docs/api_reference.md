@@ -332,6 +332,38 @@ PUT /cartas/api/admin/{id_carta}
 }
 ```
 
+### Upload de Anexo da Cartinha (ADMIN)
+
+```
+POST /cartas/api/admin/{id_carta}/anexo
+```
+
+Envia `multipart/form-data` com o campo `file` (PDF/Imagem). Atualiza a `urlcarta`.
+
+---
+
+## Relatórios (Admin)
+
+- GET `/relatorios/` — agregador de relatórios
+- GET `/relatorios/anexos-orfaos` — objetos no bucket sem correspondência no banco
+- GET `/relatorios/anexos-referenciados` — objetos no bucket com correspondência no banco
+- GET `/relatorios/api/object-url?object_name=...` — gera URL assinada para visualização
+- POST `/relatorios/api/delete-object` — apaga objeto do bucket
+
+---
+
+## Usuários e Roles (Admin)
+
+### Usuários
+- GET `/usuarios` — lista usuários (filtros: `ativo`, `q`), paginação via `skip`/`limit`
+- GET `/usuarios/{email}` — detalhes do usuário
+- PATCH `/usuarios/{email}` — atualizar `bl_ativo`
+
+### Roles
+- GET `/usuarios/roles` — lista de roles disponíveis
+- POST `/usuarios/{email}/roles/{role_code}` — atribui role
+- DELETE `/usuarios/{email}/roles/{role_code}` — revoga role
+
 ### Excluir uma Cartinha
 
 ```

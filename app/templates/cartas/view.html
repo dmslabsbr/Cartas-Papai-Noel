@@ -2,6 +2,12 @@
 
 {% block title %}Cartinha {{ carta.nome }} - Noel{% endblock %}
 
+{% block page_header %}
+{% with header_title="Cartinha #" ~ carta.id_carta, header_subtitle=carta.nome, show_greeting=False %}
+  {% include "_header.html" %}
+{% endwith %}
+{% endblock %}
+
 {% block extra_css %}
 <style>
   .carta-header {
@@ -56,7 +62,12 @@
           <span class="badge bg-secondary">{{ carta.status }}</span>
           {% endif %}
           
-          <span class="ms-2">{{ "Menino" if carta.sexo == "M" else "Menina" }}</span>
+          <span class="ms-2">
+            {{ "Menino" if carta.sexo == "M" else "Menina" }}
+            {% if carta.idade is not none %}
+              – {{ carta.idade }} {{ 'ano' if carta.idade == 1 else 'anos' }}
+            {% endif %}
+          </span>
           {% if carta.urlcarta %}
           <span class="badge rounded-pill text-bg-info ms-2">Possui anexo</span>
           {% endif %}
@@ -79,7 +90,7 @@
       <div class="carta-section">
         <p class="carta-label">Anexo:</p>
         <p>
-          <a href="{{ carta.urlcarta }}" target="_blank" rel="noopener" class="btn btn-outline-info btn-sm">Abrir anexo</a>
+          <a href="/cartas/anexo/{{ carta.id_carta }}" target="_blank" rel="noopener" class="btn btn-outline-info btn-sm">Abrir anexo</a>
         </p>
       </div>
       {% endif %}
@@ -233,6 +244,14 @@
             <input type="text" class="form-control" id="edit_presente" name="presente" value="{{ carta.presente }}" required>
           </div>
           <div class="mb-3">
+            <label for="edit_idade" class="form-label">Idade</label>
+            <select class="form-select" id="edit_idade" name="idade">
+              {% for n in range(0, 16) %}
+              <option value="{{ n }}" {% if carta.idade is not none and carta.idade == n %}selected{% endif %}>{{ n }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
             <label for="edit_status" class="form-label">Status</label>
             <select class="form-select" id="edit_status" name="status" required>
               <option value="disponível" {% if carta.status == "disponível" %}selected{% endif %}>Disponível</option>
@@ -245,6 +264,26 @@
             <label for="edit_observacao" class="form-label">Observação</label>
             <textarea class="form-control" id="edit_observacao" name="observacao" rows="3">{{ carta.observacao or "" }}</textarea>
           </div>
+      <!-- Campo de anexo para edição (ADMIN) -->
+      <div class="mb-2" id="edit_anexo_current_wrap" style="display: {% if carta.urlcarta %}{% else %}none{% endif %};">
+        <span class="text-muted">Anexo atual:</span>
+        {% if carta.urlcarta %}
+        <a id="edit_anexo_current_link" href="{{ carta.urlcarta }}" target="_blank" rel="noopener" class="btn btn-outline-info btn-sm ms-2">Ver imagem</a>
+        {% else %}
+        <a id="edit_anexo_current_link" href="#" target="_blank" rel="noopener" class="btn btn-outline-info btn-sm ms-2" style="display:none;">Ver imagem</a>
+        {% endif %}
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" value="1" id="edit_remove_anexo">
+          <label class="form-check-label" for="edit_remove_anexo">
+            Remover anexo (não apaga do servidor)
+          </label>
+        </div>
+      </div>
+      <div class="mb-1">
+        <label for="edit_anexo" class="form-label">Anexo (PDF/Imagem)</label>
+        <input type="file" class="form-control" id="edit_anexo" name="anexo" accept="application/pdf,image/*">
+      </div>
+      <div class="form-text">Se você enviar um novo arquivo, ele substituirá o anexo atual.</div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -327,35 +366,83 @@
 {% if is_admin %}
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    // Enviar formulário de edição via API
-    document.getElementById('editCartaForm').addEventListener('submit', function(event) {
-      event.preventDefault();
-      
-      const formData = new FormData(this);
-      const data = Object.fromEntries(formData.entries());
-      
-      fetch(`/cartas/api/admin/{{ carta.id_carta }}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Erro ao atualizar cartinha');
-        }
-        return response.json();
-      })
-      .then(data => {
-        // Fechar o modal e recarregar a página
-        const modal = bootstrap.Modal.getInstance(document.getElementById('editCartaModal'));
-        modal.hide();
-        window.location.reload();
-      })
-      .catch(error => {
-        alert('Erro ao atualizar cartinha: ' + error.message);
+    const editModal = document.getElementById('editCartaModal');
+    if (editModal) {
+      editModal.addEventListener('show.bs.modal', function () {
+        const fileInput = document.getElementById('edit_anexo');
+        if (fileInput) fileInput.value = '';
+        const wrap = document.getElementById('edit_anexo_current_wrap');
+        const link = document.getElementById('edit_anexo_current_link');
+        const hasLink = !!(link && link.getAttribute('href') && link.getAttribute('href') !== '#');
+        if (wrap) wrap.style.display = hasLink ? '' : 'none';
+        if (link) link.style.display = hasLink ? '' : 'none';
+        const removeCheck = document.getElementById('edit_remove_anexo');
+        if (removeCheck) removeCheck.checked = false;
       });
+    }
+
+    // Enviar formulário de edição via API (com anexo opcional)
+    document.getElementById('editCartaForm').addEventListener('submit', async function(event) {
+      event.preventDefault();
+
+      const formEl = this;
+      const formData = new FormData(formEl);
+      const fileInput = document.getElementById('edit_anexo');
+      const removeCheck = document.getElementById('edit_remove_anexo');
+
+      // Validação de tipo no cliente
+      if (fileInput && fileInput.files && fileInput.files[0]) {
+        const allowed = ['application/pdf','image/jpeg','image/png','image/webp'];
+        if (!allowed.includes(fileInput.files[0].type)) {
+          alert('Arquivo inválido. Envie PDF ou imagem (JPEG/PNG/WEBP).');
+          return;
+        }
+      }
+
+      // Remover arquivo do payload JSON
+      formData.delete('anexo');
+      const data = Object.fromEntries(formData.entries());
+      if (data.idade !== undefined) {
+        data.idade = data.idade === '' ? null : parseInt(data.idade, 10);
+      }
+      if (removeCheck && removeCheck.checked) {
+        data.urlcarta = null;
+      }
+
+      try {
+        // 1) Atualizar dados da cartinha
+        const resp = await fetch(`/cartas/api/admin/{{ carta.id_carta }}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+          credentials: 'same-origin',
+        });
+        if (!resp.ok) throw new Error('Erro ao atualizar cartinha');
+        await resp.json();
+
+        // 2) Se houver arquivo e não for remoção, faz upload multipart
+        if (fileInput && fileInput.files && fileInput.files[0]) {
+          const fd = new FormData();
+          fd.append('file', fileInput.files[0]);
+          const uploadResp = await fetch(`/cartas/api/admin/{{ carta.id_carta }}/anexo`, {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin',
+          });
+          if (!uploadResp.ok) {
+            const errText = await uploadResp.text();
+            console.error('[View] Falha upload (edit):', errText);
+            throw new Error('Erro ao enviar anexo');
+          }
+          await uploadResp.json();
+        }
+
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editCartaModal'));
+        modal && modal.hide();
+        window.location.reload();
+      } catch (error) {
+        alert('Erro ao atualizar cartinha: ' + (error.message || 'Erro desconhecido'));
+      }
     });
   });
 </script>

@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any, Union
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, text
+from sqlalchemy import and_, or_, desc, text, func
 from datetime import datetime
 
 from app.models import Usuario, UserRole, Role
@@ -155,6 +155,32 @@ class UsuariosRepository(BaseRepository[Usuario, UsuarioSchema, UsuarioCreate, U
         self.db.delete(user_role)
         self.db.commit()
         return True
+
+    # --- Admin helpers ---
+    def user_has_role(self, email: str, role_code: str) -> bool:
+        role = self.db.query(Role).filter(Role.code == role_code).first()
+        if not role:
+            return False
+        exists = self.db.query(UserRole).filter(
+            and_(UserRole.user_email == email, UserRole.role_id == role.id)
+        ).first()
+        return exists is not None
+
+    def count_active_admins(self) -> int:
+        q = (
+            self.db.query(func.count(Usuario.email))
+            .join(UserRole, UserRole.user_email == Usuario.email)
+            .join(Role, Role.id == UserRole.role_id)
+            .filter(Usuario.bl_ativo == True, Role.code == "ADMIN")
+        )
+        return int(q.scalar() or 0)
+
+    def is_last_active_admin(self, email: str) -> bool:
+        # Se somente 1 admin ativo e é este email (e ele tem role ADMIN)
+        total = self.count_active_admins()
+        if total != 1:
+            return False
+        return self.user_has_role(email, "ADMIN") and (self.get_by_email(email).bl_ativo is True)
     
     def deactivate_user(self, email: str) -> bool:
         """

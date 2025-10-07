@@ -2,9 +2,14 @@
 
 {% block title %}Relatório - Anexos órfãos{% endblock %}
 
+{% block page_header %}
+{% with header_title="Anexos órfãos", header_subtitle="Arquivos no bucket não referenciados por cartinhas ativas" %}
+  {% include "_header.html" %}
+{% endwith %}
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h1>Anexos órfãos</h1>
   <a href="/relatorios/" class="btn btn-outline-secondary">Voltar aos Relatórios</a>
 </div>
 

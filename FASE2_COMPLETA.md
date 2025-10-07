@@ -157,9 +157,9 @@ Tabela `cartas_diversas` (já existente):
 - CRUD Cartas concluído (com regras 1–5), depois CRUD Usuários (admin), depois CRUD Roles/UserRoles (admin), todos com testes e documentação.
 
 ## Checklist de Conclusão (para quando finalizar a fase)
-- [ ] Autenticação e sessão configuradas (dev e prod)
-- [ ] Migrações Alembic aplicadas (baseline + entrega)
-- [ ] CRUD Cartas implementado e testado
-- [ ] CRUD Usuários (admin) implementado e testado
-- [ ] CRUD Roles/UserRoles (admin) implementado e testado
-- [ ] Documentação atualizada (OpenAPI e README)
+- [x] Autenticação e sessão configuradas (dev e prod) — sessão e dependências ativas; integração externa em uso
+- [x] Migrações Alembic aplicadas (baseline + entrega) — campos de entrega e `urlcarta`
+- [x] CRUD Cartas implementado e testado — adoção/liberação/entrega + upload de anexos
+- [x] CRUD Usuários (admin) implementado (API)
+- [x] CRUD Roles/UserRoles (admin) implementado (API)
+- [x] Documentação atualizada (OpenAPI e README) — `docs/api_reference.md` e `README.md`

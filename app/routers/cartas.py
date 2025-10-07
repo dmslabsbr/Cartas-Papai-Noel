@@ -1,17 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status, Form, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 import logging
 
+from app.version import read_version
+from app.utils.template_helpers import first_name_from_user  # helper nome
+
 from app.db import get_db
 from app.dependencies import get_current_user, require_roles
 from app.dependencies import get_optional_user
 from app.repositories import CartasRepository
+from app.repositories.icon_presente_repository import IconPresenteRepository
 from app.schemas import CartaSchema, CartaCreate, CartaUpdate, CartaAdopt
 from app.services.storage_service import StorageService
+import io
 
 logger = logging.getLogger("uvicorn")
 
@@ -24,6 +29,9 @@ router = APIRouter(
 
 # Templates
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
+# Expor versão do app globalmente para os templates deste router
+templates.env.globals["app_version"] = read_version()
+templates.env.globals["first_name_from_user"] = first_name_from_user
 
 # Rotas para interface web
 
@@ -41,6 +49,7 @@ async def list_cartas(
     Lista de cartinhas com paginação e filtros. Público: sem login.
     """
     repository = CartasRepository(db)
+    icon_repo = IconPresenteRepository(db)
     skip = (page - 1) * per_page
     
     # Filtrar por status se especificado
@@ -98,11 +107,17 @@ async def list_cartas(
     has_next = page < total_pages
     has_prev = page > 1
     
+    # Mapear ícones sugeridos por id_carta para lookup simples no template
+    icons_by_id: dict[int, list[str]] = {}
+    for c in cartas:
+        icons_by_id[c.id_carta] = icon_repo.icons_for_present_text(getattr(c, 'presente', '') or '')
+
     return templates.TemplateResponse(
         "cartas/list.html",
         {
             "request": request,
-            "cartas": cartas,
+            "cartas": cartas,  # manter compatibilidade existente
+            "icons_by_id": icons_by_id,
             "user": user or {},
             "q": q,
             "status_filter": status,
@@ -164,6 +179,129 @@ async def admin_cartas(
             }
         }
     )
+
+
+@router.get("/admin/miniaturas", response_class=HTMLResponse)
+async def admin_miniaturas_page(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_roles(["ADMIN"])),
+    db: Session = Depends(get_db)
+):
+    """Página para gerar miniaturas das imagens das cartinhas (ADMIN)."""
+    repo = CartasRepository(db)
+    storage = StorageService()
+    # Cartas com URL
+    cartas = repo.db.query(repo.model).filter(
+        repo.model.del_bl == False,
+        repo.model.urlcarta != None
+    ).order_by(repo.model.id.desc()).all()
+
+    # Tentar extrair object_name e checar se miniatura já existe (suffix _thumb.jpg)
+    def extract_object(url_or_name: str) -> str:
+        """Extrai o object_name aceitando tanto URL completa quanto object_name puro.
+        Exemplos aceitos:
+        - 'cartas/10/anexo-xxx.png' (já é object_name)
+        - 'http://host/bucket/cartas/10/anexo-xxx.png?...'
+        - '.../cartas/10/anexo-xxx.png' (qualquer URL contendo prefixo 'cartas/')
+        """
+        if not url_or_name:
+            return ''
+        # Se já parecer um object_name
+        if url_or_name.startswith('cartas/'):
+            return url_or_name
+        base = url_or_name.split('?', 1)[0]
+        parts = base.split('/')
+        # Caso URL contenha explicitamente o bucket
+        if storage.bucket in parts:
+            idx = parts.index(storage.bucket)
+            return '/'.join(parts[idx+1:])
+        # Fallback: procurar prefixo conhecido
+        if 'cartas/' in base:
+            return base.split('cartas/', 1)[1].strip('/')
+        return ''
+
+    items = []
+    client = storage._client()
+    for c in cartas:
+        obj = extract_object(getattr(c, 'urlcarta', '') or '')
+        if not obj:
+            continue
+        thumb_name = obj.rsplit('.', 1)[0] + "_thumb.jpg"
+        has_thumb = False
+        # checar existência
+        try:
+            client.stat_object(storage.bucket, thumb_name)
+            has_thumb = True
+        except Exception:
+            has_thumb = False
+        items.append({
+            "id_carta": c.id_carta,
+            "object_name": obj,
+            "thumb_name": thumb_name,
+            "has_thumb": has_thumb,
+        })
+
+    return templates.TemplateResponse(
+        "cartas/miniaturas.html",
+        {"request": request, "user": user, "items": items}
+    )
+
+
+@router.post("/admin/miniaturas/generate", response_model=Dict[str, Any])
+async def admin_generate_thumbnail(
+    payload: Dict[str, Any],
+    user: Dict[str, Any] = Depends(require_roles(["ADMIN"]))
+):
+    """Gera miniatura 200x300 para o objeto informado e grava no mesmo prefixo."""
+    storage = StorageService()
+    client = storage._client()
+
+    object_name = (payload or {}).get("object_name")
+    if not object_name:
+        raise HTTPException(status_code=400, detail="object_name é obrigatório")
+
+    # Pré-verificação simples por extensão
+    if object_name.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="PDF não suportado para miniatura no momento")
+
+    # Baixar objeto original em memória
+    response = None
+    try:
+        response = client.get_object(storage.bucket, object_name)
+        data = response.read()
+    finally:
+        if response is not None:
+            try:
+                response.close()
+                response.release_conn()
+            except Exception:
+                pass
+
+    # Abrir como imagem (se PDF, tentar primeira página no futuro; por ora, erro)
+    try:
+        try:
+            from PIL import Image  # lazy import
+        except ImportError:
+            raise HTTPException(status_code=500, detail="Dependência 'Pillow' não instalada. Execute: pip install Pillow")
+        with Image.open(io.BytesIO(data)) as im:
+            im = im.convert('RGB')
+            im.thumbnail((200, 300))
+            out = io.BytesIO()
+            im.save(out, format='JPEG', quality=85)
+            out.seek(0)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Arquivo não é uma imagem suportada para miniatura")
+
+    thumb_name = object_name.rsplit('.', 1)[0] + "_thumb.jpg"
+    client.put_object(
+        storage.bucket,
+        thumb_name,
+        data=out,
+        length=out.getbuffer().nbytes,
+        content_type='image/jpeg'
+    )
+    url = storage.get_presigned_url(thumb_name)
+    return {"thumb_object": thumb_name, "url": url}
 
 @router.get("/{id_carta}", response_class=HTMLResponse)
 async def view_carta(
@@ -355,14 +493,15 @@ async def api_upload_anexo(
     storage = StorageService()
     try:
         object_name = storage.upload_carta_anexo(id_carta, file)
-        url = storage.get_presigned_url(object_name)
-        # Persistir URL pública (pode ser a assinada curta; para público duradouro, use política/bucket público)
-        carta.urlcarta = url
+        # Persistir o identificador estável do objeto (object_name) em vez de URL presignada expirada
+        carta.urlcarta = object_name
         carta.updated_at = carta.updated_at or None  # garantir mudança
         db.add(carta)
         db.commit()
         db.refresh(carta)
         logger.info("[Upload] Sucesso id_carta=%s object=%s", id_carta, object_name)
+        # Retornar também uma URL presignada para uso imediato no cliente
+        url = storage.get_presigned_url(object_name)
         return {"object_name": object_name, "url": url}
     except HTTPException:
         # Já logado dentro do serviço; propagar
@@ -380,10 +519,81 @@ async def api_get_anexo(
     Retorna uma URL assinada temporária para o último anexo da carta (ADMIN por enquanto).
     """
     storage = StorageService()
-    url = storage.get_latest_carta_anexo_url(id_carta)
-    if not url:
+    from sqlalchemy.orm import Session
+    from app.db import get_db
+    from fastapi import Depends as _Depends
+    # Obter carta para ler campo urlcarta (pode conter object_name ou URL antiga)
+    async def _get_urlcarta(db: Session = _Depends(get_db)):
+        repo = CartasRepository(db)
+        c = repo.get_by_id_carta(id_carta)
+        return getattr(c, 'urlcarta', None) if c else None
+    urlcarta = await _get_urlcarta()  # type: ignore
+
+    def _extract_object(url_or_name: str) -> str:
+        if not url_or_name:
+            return ''
+        # Se já parecer um object_name (começa com 'cartas/')
+        if url_or_name.startswith('cartas/'):
+            return url_or_name
+        base = url_or_name.split('?', 1)[0]
+        parts = base.split('/')
+        if storage.bucket in parts:
+            idx = parts.index(storage.bucket)
+            return '/'.join(parts[idx+1:])
+        # fallback: tentar localizar prefixo 'cartas/' em qualquer posição
+        if 'cartas/' in base:
+            return base.split('cartas/', 1)[1].strip('/')
+        return ''
+
+    object_name = _extract_object(urlcarta or '')
+    if not object_name:
+        # fallback para utilitário do storage, se existir
+        try:
+            url = storage.get_latest_carta_anexo_url(id_carta)
+            if url:
+                return {"url": url}
+        except Exception:
+            pass
         raise HTTPException(status_code=404, detail="Anexo não encontrado")
+
+    url = storage.get_presigned_url(object_name)
     return {"url": url}
+
+
+@router.get("/anexo/{id_carta}")
+async def public_redirect_to_anexo(
+    id_carta: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Redireciona para uma URL assinada temporária do anexo da cartinha.
+    Aberto (mesma política anterior de exibir anexo publicamente).
+    """
+    storage = StorageService()
+    # Buscar a carta e extrair o object_name do campo urlcarta (suporta legacy URL)
+    repo = CartasRepository(db)
+    c = repo.get_by_id_carta(id_carta)
+    if not c or not getattr(c, 'urlcarta', None):
+        raise HTTPException(status_code=404, detail="Anexo não encontrado")
+    urlcarta = c.urlcarta or ''
+    def _extract_object(url_or_name: str) -> str:
+        if not url_or_name:
+            return ''
+        if url_or_name.startswith('cartas/'):
+            return url_or_name
+        base = url_or_name.split('?', 1)[0]
+        parts = base.split('/')
+        if storage.bucket in parts:
+            idx = parts.index(storage.bucket)
+            return '/'.join(parts[idx+1:])
+        if 'cartas/' in base:
+            return base.split('cartas/', 1)[1].strip('/')
+        return ''
+    object_name = _extract_object(urlcarta)
+    if not object_name:
+        raise HTTPException(status_code=404, detail="Anexo não encontrado")
+    url = storage.get_presigned_url(object_name)
+    return RedirectResponse(url=url, status_code=302)
 
 # API REST
 

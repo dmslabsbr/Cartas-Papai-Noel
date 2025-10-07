@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Gerar miniaturas{% endblock %}
+
+{% block page_header %}
+{% with header_title="Miniaturas", header_subtitle="Gerar imagens 200x300 para anexos" %}
+  {% include "_header.html" %}
+{% endwith %}
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="/cartas/admin" class="btn btn-outline-secondary">Voltar</a>
+  <button class="btn btn-primary ms-2" id="btnGerarSelecionados">Gerar selecionados</button>
+  <span class="text-muted small ms-2">Gera JPEG 200x300 no mesmo local do MinIO com sufixo <code>_thumb.jpg</code>.</span>
+  <hr>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-striped align-middle" id="tblMiniaturas">
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="ckAll"></th>
+        <th>ID Carta</th>
+        <th>Objeto</th>
+        <th>Miniatura</th>
+        <th class="text-end">Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td><input type="checkbox" class="ckRow"></td>
+        <td>{{ item.id_carta }}</td>
+        <td class="text-break">{{ item.object_name }}</td>
+        <td>
+          {% if item.has_thumb %}
+          <span class="badge text-bg-success">Existe</span>
+          {% else %}
+          <span class="badge text-bg-secondary">Não existe</span>
+          {% endif %}
+        </td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-primary btnGerar" data-object="{{ item.object_name }}">Gerar</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Toast -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+  <div id="thumbToast" class="toast text-bg-success" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body" id="thumbToastBody">Ação concluída.</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const tbl = document.querySelector('#tblMiniaturas tbody');
+    const toastEl = document.getElementById('thumbToast');
+    const toastBody = document.getElementById('thumbToastBody');
+
+    function showToast(msg, klass) {
+      if (klass) toastEl.className = 'toast ' + klass;
+      toastBody.textContent = msg;
+      new bootstrap.Toast(toastEl, { delay: 1200 }).show();
+    }
+
+    async function gerar(objectName) {
+      const r = await fetch('/cartas/admin/miniaturas/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ object_name: objectName })
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        showToast('Falhou: ' + t, 'text-bg-danger');
+        return false;
+      }
+      await r.json();
+      showToast('Miniatura gerada');
+      return true;
+    }
+
+    // Ação por linha
+    tbl.querySelectorAll('.btnGerar').forEach(el => {
+      el.addEventListener('click', async function () {
+        const obj = this.getAttribute('data-object');
+        await gerar(obj);
+        // atualizar status na linha
+        const badgeCell = this.closest('tr').children[3];
+        badgeCell.innerHTML = '<span class="badge text-bg-success">Existe</span>';
+      });
+    });
+
+    // Selecionar todos
+    document.getElementById('ckAll').addEventListener('change', function () {
+      tbl.querySelectorAll('.ckRow').forEach(c => c.checked = this.checked);
+    });
+
+    // Gerar selecionados
+    document.getElementById('btnGerarSelecionados').addEventListener('click', async function () {
+      const rows = Array.from(tbl.querySelectorAll('tr'));
+      for (const row of rows) {
+        const ck = row.querySelector('.ckRow');
+        const btn = row.querySelector('.btnGerar');
+        if (ck && ck.checked && btn) {
+          const obj = btn.getAttribute('data-object');
+          const ok = await gerar(obj);
+          if (ok) {
+            row.children[3].innerHTML = '<span class="badge text-bg-success">Existe</span>';
+          }
+        }
+      }
+    });
+  });
+</script>
+{% endblock %}
+
+
