@@ -108,6 +108,15 @@
       {% endif %}
       
       <div class="card-body">
+        {% if carta.urlcarta_pq %}
+        <div class="text-center mb-3">
+          <img src="/cartas/miniatura/{{ carta.id_carta }}" 
+               alt="Miniatura da cartinha {{ carta.nome }}" 
+               class="img-fluid rounded" 
+               style="max-height: 120px; max-width: 100%; object-fit: cover;"
+               onerror="this.style.display='none'">
+        </div>
+        {% endif %}
         <h5 class="card-title carta-nome">
           {{ carta.nome }}
           {% if carta.urlcarta %}

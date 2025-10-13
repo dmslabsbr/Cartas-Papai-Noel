@@ -39,6 +39,9 @@
             <td>{{ item.size }}</td>
             <td>{{ item.last_modified }}</td>
             <td class="text-end">
+              {% if item.thumb_object %}
+              <button type="button" class="btn btn-sm btn-outline-secondary me-2 btn-view-thumb" data-object="{{ item.thumb_object }}" title="Ver miniatura">🖥️</button>
+              {% endif %}
               <button type="button" class="btn btn-sm btn-outline-info me-2 btn-view" data-object="{{ item.object_name }}" title="Visualizar">📺</button>
             </td>
           </tr>
@@ -84,6 +87,20 @@
           window.open(data.url, '_blank', 'noopener');
         } catch (e) {
           showToast('Não foi possível abrir o anexo', 'text-bg-danger');
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-view-thumb').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const objectName = this.getAttribute('data-object');
+        try {
+          const resp = await fetch(`/relatorios/api/object-url?object_name=${encodeURIComponent(objectName)}`);
+          if (!resp.ok) throw new Error('Falha ao obter URL');
+          const data = await resp.json();
+          window.open(data.url, '_blank', 'noopener');
+        } catch (e) {
+          showToast('Não foi possível abrir a miniatura', 'text-bg-danger');
         }
       });
     });

@@ -105,7 +105,13 @@ app.include_router(permissoes_router)
 @app.on_event("startup")
 async def _log_version_on_startup() -> None:
     logger = logging.getLogger("uvicorn")
-    logger.info("Noel API starting - version=%s environment=%s", APP_VERSION, SETTINGS.environment)
+    print(f"🚀 Noel API starting - version={APP_VERSION} environment={SETTINGS.environment}")
+    logger.info("🚀 Noel API starting - version=%s environment=%s", APP_VERSION, SETTINGS.environment)
+    logger.info("📊 Database URL: %s", SETTINGS.database_url.split("@")[0] + "@***" if "@" in SETTINGS.database_url else SETTINGS.database_url)
+    logger.info("🗄️ MinIO Endpoint: %s", SETTINGS.minio_endpoint)
+    logger.info("🔐 LDAP API URL: %s", SETTINGS.ldap_api_url)
+    logger.info("📁 Thumbnail Size: %s", getattr(SETTINGS, 'thumb_size', '200x300'))
+    print(f"✅ Startup completed successfully!")
 
 
 async def _check_minio_ready(*, debug: bool = False) -> Union[Dict[str, Any], bool]:

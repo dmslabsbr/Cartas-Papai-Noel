@@ -7,6 +7,7 @@ from pathlib import Path
 import logging
 
 from app.version import read_version
+from app.config import get_settings
 from app.utils.template_helpers import first_name_from_user  # helper nome
 
 from app.db import get_db
@@ -241,16 +242,21 @@ async def admin_miniaturas_page(
             "has_thumb": has_thumb,
         })
 
+    # Obter THUMB_SIZE das configurações
+    settings = get_settings()
+    thumb_size = getattr(settings, "thumb_size", "200x300")
+    
     return templates.TemplateResponse(
         "cartas/miniaturas.html",
-        {"request": request, "user": user, "items": items}
+        {"request": request, "user": user, "items": items, "thumb_size": thumb_size}
     )
 
 
 @router.post("/admin/miniaturas/generate", response_model=Dict[str, Any])
 async def admin_generate_thumbnail(
     payload: Dict[str, Any],
-    user: Dict[str, Any] = Depends(require_roles(["ADMIN"]))
+    user: Dict[str, Any] = Depends(require_roles(["ADMIN"])),
+    db: Session = Depends(get_db),
 ):
     """Gera miniatura 200x300 para o objeto informado e grava no mesmo prefixo."""
     storage = StorageService()
@@ -277,6 +283,22 @@ async def admin_generate_thumbnail(
             except Exception:
                 pass
 
+    # Determinar tamanho desejado a partir de settings (THUMB_SIZE, ex.: "200x300")
+    def _parse_thumb_size(size_str: str) -> tuple[int, int]:
+        try:
+            s = (size_str or "").lower().replace(" ", "")
+            if "x" in s:
+                w_str, h_str = s.split("x", 1)
+                w = max(1, int(w_str))
+                h = max(1, int(h_str))
+                return (w, h)
+        except Exception:
+            pass
+        return (200, 300)
+
+    settings = get_settings()
+    thumb_w, thumb_h = _parse_thumb_size(getattr(settings, "thumb_size", "200x300"))
+
     # Abrir como imagem (se PDF, tentar primeira página no futuro; por ora, erro)
     try:
         try:
@@ -285,7 +307,7 @@ async def admin_generate_thumbnail(
             raise HTTPException(status_code=500, detail="Dependência 'Pillow' não instalada. Execute: pip install Pillow")
         with Image.open(io.BytesIO(data)) as im:
             im = im.convert('RGB')
-            im.thumbnail((200, 300))
+            im.thumbnail((thumb_w, thumb_h))
             out = io.BytesIO()
             im.save(out, format='JPEG', quality=85)
             out.seek(0)
@@ -301,7 +323,30 @@ async def admin_generate_thumbnail(
         content_type='image/jpeg'
     )
     url = storage.get_presigned_url(thumb_name)
-    return {"thumb_object": thumb_name, "url": url}
+
+    # Persistir o caminho estável (object_name) da miniatura na carta correspondente (urlcarta_pq)
+    def _extract_id_carta_from_object(name: str) -> Optional[int]:
+        try:
+            parts = (name or "").split('/')
+            # esperado: cartas/{id_carta}/arquivo
+            if len(parts) >= 3 and parts[0] == 'cartas':
+                return int(parts[1])
+        except Exception:
+            return None
+        return None
+
+    id_carta_ref = _extract_id_carta_from_object(object_name)
+    if id_carta_ref is not None:
+        repo = CartasRepository(db)
+        c = repo.get_by_id_carta(id_carta_ref)
+        if c:
+            # armazenar o identificador estável (object_name) que não expira
+            c.urlcarta_pq = thumb_name
+            db.add(c)
+            db.commit()
+            db.refresh(c)
+
+    return {"thumb_object": thumb_name, "url": url, "size": f"{thumb_w}x{thumb_h}", "object_name": object_name}
 
 @router.get("/{id_carta}", response_class=HTMLResponse)
 async def view_carta(
@@ -593,6 +638,29 @@ async def public_redirect_to_anexo(
     if not object_name:
         raise HTTPException(status_code=404, detail="Anexo não encontrado")
     url = storage.get_presigned_url(object_name)
+    return RedirectResponse(url=url, status_code=302)
+
+@router.get("/miniatura/{id_carta}")
+async def public_redirect_to_miniatura(
+    id_carta: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Redireciona para uma URL assinada temporária da miniatura da cartinha.
+    Aberto (mesma política de exibir anexo publicamente).
+    """
+    storage = StorageService()
+    # Buscar a carta e extrair o object_name do campo urlcarta_pq
+    repo = CartasRepository(db)
+    c = repo.get_by_id_carta(id_carta)
+    if not c or not getattr(c, 'urlcarta_pq', None):
+        raise HTTPException(status_code=404, detail="Miniatura não encontrada")
+    
+    thumb_object_name = c.urlcarta_pq
+    if not thumb_object_name:
+        raise HTTPException(status_code=404, detail="Miniatura não encontrada")
+    
+    url = storage.get_presigned_url(thumb_object_name)
     return RedirectResponse(url=url, status_code=302)
 
 # API REST

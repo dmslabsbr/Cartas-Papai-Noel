@@ -33,6 +33,7 @@
         <thead>
           <tr>
             <th>Objeto</th>
+            <th>Miniatura</th>
             <th>Tamanho (bytes)</th>
             <th>Modificado em</th>
             <th class="text-end">Ações</th>
@@ -42,9 +43,19 @@
           {% for item in anexos_orfaos %}
           <tr>
             <td class="text-break">{{ item.object_name }}</td>
+            <td class="text-break">
+              {% if item.thumb_object %}
+                {{ item.thumb_object }}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
             <td>{{ item.size }}</td>
             <td>{{ item.last_modified }}</td>
             <td class="text-end">
+              {% if item.thumb_object %}
+              <button type="button" class="btn btn-sm btn-outline-secondary me-2 btn-view" data-object="{{ item.thumb_object }}" title="Ver miniatura">🖥️</button>
+              {% endif %}
               <button type="button" class="btn btn-sm btn-outline-info me-2 btn-view" data-object="{{ item.object_name }}" title="Visualizar">📺</button>
               <button type="button" class="btn btn-sm btn-outline-danger btn-delete" data-object="{{ item.object_name }}" title="Apagar">🔥</button>
             </td>

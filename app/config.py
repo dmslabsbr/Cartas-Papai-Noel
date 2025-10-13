@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     session_secret_key: str = Field(default="insecure_key_for_dev_only", alias="SESSION_SECRET_KEY")
     session_max_age: int = Field(default=86400, alias="SESSION_MAX_AGE")  # 24 horas em segundos
 
+    # Tamanho padrão da miniatura gerada (LxA), ex.: "200x300"
+    thumb_size: str = Field(default="200x300", alias="THUMB_SIZE")
+
     # pydantic-settings v2 style config
     model_config = SettingsConfigDict(
         env_file=".env",

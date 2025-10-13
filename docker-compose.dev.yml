@@ -1,0 +1,119 @@
+# ===========================================
+# DOCKER COMPOSE PARA DESENVOLVIMENTO
+# ===========================================
+# Use este arquivo para desenvolvimento local
+# docker compose -f docker-compose.dev.yml up
+
+version: '3.8'
+
+services:
+  # Aplicação Noel - Desenvolvimento
+  noel-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: noel-app-dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+psycopg://noel_user:dev_password@postgres:5432/noel_db
+      - SESSION_SECRET_KEY=dev_secret_key_not_for_production
+      - SESSION_MAX_AGE=86400
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_BUCKET=cartas
+      - MINIO_SECURE=false
+      - LDAP_API_URL=http://ldap-api:8080
+      - THUMB_SIZE=150x200
+    volumes:
+      # Hot reload do código
+      - ./app:/app/app:ro
+      - ./alembic:/app/alembic:ro
+      - ./alembic.ini:/app/alembic.ini:ro
+      - ./VERSION:/app/VERSION:ro
+      # Logs locais
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - noel-dev-network
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # PostgreSQL - Desenvolvimento
+  postgres:
+    image: postgres:15-alpine
+    container_name: noel-postgres-dev
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=noel_db
+      - POSTGRES_USER=noel_user
+      - POSTGRES_PASSWORD=dev_password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - noel-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U noel_user -d noel_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO - Desenvolvimento
+  minio:
+    image: minio/minio:latest
+    container_name: noel-minio-dev
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+    volumes:
+      - minio_dev_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - noel-dev-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # MinIO Client para inicialização
+  minio-init:
+    image: minio/mc:latest
+    container_name: noel-minio-init-dev
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set minio http://minio:9000 minioadmin minioadmin123;
+      mc mb minio/cartas --ignore-existing;
+      mc policy set public minio/cartas;
+      echo 'MinIO bucket cartas criado e configurado com sucesso';
+      "
+    networks:
+      - noel-dev-network
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  minio_dev_data:
+    driver: local
+
+networks:
+  noel-dev-network:
+    driver: bridge

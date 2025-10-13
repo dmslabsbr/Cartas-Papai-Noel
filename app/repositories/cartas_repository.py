@@ -312,3 +312,25 @@ class CartasRepository(BaseRepository[CartaDiversa, CartaSchema, CartaCreate, Ca
         self.db.commit()
         self.db.refresh(db_obj)
         return db_obj
+    
+    def soft_delete(self, id_carta: int) -> bool:
+        """
+        Marca uma cartinha como deletada logicamente (soft delete).
+        
+        Args:
+            id_carta: ID da cartinha a ser deletada
+            
+        Returns:
+            True se a cartinha foi deletada, False se não encontrada
+        """
+        carta = self.get_by_id_carta(id_carta)
+        if not carta or carta.del_bl:
+            return False
+        
+        carta.del_bl = True
+        carta.del_time = datetime.now()
+        carta.updated_at = datetime.now()
+        
+        self.db.add(carta)
+        self.db.commit()
+        return True

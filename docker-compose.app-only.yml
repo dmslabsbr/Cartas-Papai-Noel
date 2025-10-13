@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  # Aplicação Noel - Apenas a aplicação
+  noel-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: noel-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Configurações da aplicação
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
+      - SESSION_MAX_AGE=86400
+      
+      # MinIO (servidor externo)
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_BUCKET=${MINIO_BUCKET}
+      - MINIO_SECURE=${MINIO_SECURE}
+      
+      # LDAP
+      - LDAP_API_URL=${LDAP_API_URL}
+      
+      # Thumbnails
+      - THUMB_SIZE=${THUMB_SIZE}
+    volumes:
+      - noel_logs:/app/logs
+    networks:
+      - noel-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  noel_logs:
+    driver: local
+
+networks:
+  noel-network:
+    driver: bridge

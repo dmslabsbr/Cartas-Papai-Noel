@@ -3,7 +3,7 @@
 {% block title %}Gerar miniaturas{% endblock %}
 
 {% block page_header %}
-{% with header_title="Miniaturas", header_subtitle="Gerar imagens 200x300 para anexos" %}
+{% with header_title="Miniaturas", header_subtitle="Gerar imagens " + thumb_size + " para anexos" %}
   {% include "_header.html" %}
 {% endwith %}
 {% endblock %}
@@ -12,7 +12,8 @@
 <div class="mb-3">
   <a href="/cartas/admin" class="btn btn-outline-secondary">Voltar</a>
   <button class="btn btn-primary ms-2" id="btnGerarSelecionados">Gerar selecionados</button>
-  <span class="text-muted small ms-2">Gera JPEG 200x300 no mesmo local do MinIO com sufixo <code>_thumb.jpg</code>.</span>
+  <button class="btn btn-outline-secondary ms-2" id="btnSelecionarSemMiniatura">Selecionar cartas sem miniatura</button>
+  <span class="text-muted small ms-2">Gera JPEG {{ thumb_size }} no mesmo local do MinIO com sufixo <code>_thumb.jpg</code>.</span>
   <hr>
 </div>
 
@@ -41,7 +42,7 @@
           {% endif %}
         </td>
         <td class="text-end">
-          <button class="btn btn-sm btn-outline-primary btnGerar" data-object="{{ item.object_name }}">Gerar</button>
+          <button class="btn btn-sm btn-outline-primary btnGerar" data-object="{{ item.object_name }}" data-id-carta="{{ item.id_carta }}">Gerar</button>
         </td>
       </tr>
       {% endfor %}
@@ -73,11 +74,11 @@
       new bootstrap.Toast(toastEl, { delay: 1200 }).show();
     }
 
-    async function gerar(objectName) {
+    async function gerar(objectName, idCarta) {
       const r = await fetch('/cartas/admin/miniaturas/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ object_name: objectName })
+        body: JSON.stringify({ object_name: objectName, id_carta: idCarta })
       });
       if (!r.ok) {
         const t = await r.text();
@@ -93,7 +94,8 @@
     tbl.querySelectorAll('.btnGerar').forEach(el => {
       el.addEventListener('click', async function () {
         const obj = this.getAttribute('data-object');
-        await gerar(obj);
+        const idc = this.getAttribute('data-id-carta');
+        await gerar(obj, idc);
         // atualizar status na linha
         const badgeCell = this.closest('tr').children[3];
         badgeCell.innerHTML = '<span class="badge text-bg-success">Existe</span>';
@@ -113,12 +115,25 @@
         const btn = row.querySelector('.btnGerar');
         if (ck && ck.checked && btn) {
           const obj = btn.getAttribute('data-object');
-          const ok = await gerar(obj);
+          const idc = btn.getAttribute('data-id-carta');
+          const ok = await gerar(obj, idc);
           if (ok) {
             row.children[3].innerHTML = '<span class="badge text-bg-success">Existe</span>';
           }
         }
       }
+    });
+
+    // Selecionar cartas sem miniatura
+    document.getElementById('btnSelecionarSemMiniatura').addEventListener('click', function () {
+      const rows = Array.from(tbl.querySelectorAll('tr'));
+      rows.forEach(row => {
+        const badge = row.querySelector('.badge');
+        const ck = row.querySelector('.ckRow');
+        if (badge && ck && badge.textContent.includes('Não existe')) {
+          ck.checked = true;
+        }
+      });
     });
   });
 </script>
