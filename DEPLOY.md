@@ -30,6 +30,8 @@ nano .env
 - `POSTGRES_PASSWORD`: Senha segura para o banco
 - `SESSION_SECRET_KEY`: Chave secreta para sessões
 - `MINIO_ACCESS_KEY` e `MINIO_SECRET_KEY`: Credenciais do MinIO
+- `LOGIN_EMAIL_DEFAULT_DOMAIN`: Domínio default para completar e-mails no login (ex.: mpgo.mp.br)
+- `THUMB_SIZE`: Tamanho da miniatura (ex.: 200x300)
 
 ### 3. Gerar Chaves Seguras
 ```bash
@@ -78,6 +80,11 @@ docker compose exec postgres pg_isready -U noel_user -d noel_db
 ```bash
 # Executar migrações do banco
 docker compose exec noel-app alembic upgrade head
+```
+
+### 3. Verificar instalação do PyMuPDF (miniatura de PDFs)
+```bash
+docker compose exec noel-app python -c "import fitz; print('PyMuPDF OK')"
 ```
 
 ### 3. Verificar Logs

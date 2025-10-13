@@ -56,6 +56,7 @@ if get_settings().environment == "development":
 # Disponibilizar versão e helpers globalmente nos templates (widget reutilizável)
 templates.env.globals["app_version"] = APP_VERSION
 templates.env.globals["first_name_from_user"] = first_name_from_user
+templates.env.globals["login_email_default_domain"] = getattr(SETTINGS, "login_email_default_domain", "mpgo.mp.br")
 static_dir = Path(__file__).resolve().parent / "static"
 static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
@@ -82,6 +83,27 @@ app.add_middleware(
     secret_key=SETTINGS.session_secret_key,
     max_age=SETTINGS.session_max_age
 )
+
+# Restringir páginas sensíveis de listagem para ADMIN/RH quando status=adotadas|entregues
+@app.middleware("http")
+async def _restrict_sensitive_cartas(request: Request, call_next):
+    try:
+        if request.method.upper() == "GET" and request.url.path == "/cartas":
+            status_q = request.query_params.get("status")
+            if status_q in ("adotadas", "entregues"):
+                user = request.session.get("user") if hasattr(request, "session") else None
+                if not user:
+                    # Redirecionar para login preservando a query string
+                    qs = str(request.query_params) or ""
+                    next_url = request.url.path + (f"?{qs}" if qs else "")
+                    return RedirectResponse(url=f"/login?next={next_url}", status_code=status.HTTP_302_FOUND)
+                roles = [r.get("code") for r in (user.get("roles") or []) if isinstance(r, dict)]
+                if not any(code in ("ADMIN", "RH") for code in roles):
+                    return RedirectResponse(url="/?error=forbidden", status_code=status.HTTP_302_FOUND)
+    except Exception:
+        # Em caso de qualquer erro, seguir o fluxo normal para não derrubar a requisição
+        pass
+    return await call_next(request)
 
 # Em desenvolvimento, evitar cache para respostas HTML para refletir mudanças imediatamente
 @app.middleware("http")
@@ -362,9 +384,15 @@ async def login_form(
     auth_service = AuthService(db)
     next_url = request.query_params.get("next", "/")
     
+    # Normalizar email: se não possuir domínio, anexar domínio padrão do .env
+    username = (form_data.username or "").strip().lower()
+    if "@" not in username and username:
+        domain = getattr(SETTINGS, "login_email_default_domain", "mpgo.mp.br").lstrip("@").strip()
+        username = f"{username}@{domain}"
+    
     try:
         success, user_data = await auth_service.authenticate(
-            username=form_data.username,
+            username=username,
             password=form_data.password
         )
         
@@ -470,8 +498,14 @@ async def api_login(
     """API para autenticação."""
     auth_service = AuthService(db)
     
+    # Normalizar email também na API
+    username = (form_data.username or "").strip().lower()
+    if "@" not in username and username:
+        domain = getattr(SETTINGS, "login_email_default_domain", "mpgo.mp.br").lstrip("@").strip()
+        username = f"{username}@{domain}"
+    
     success, user_data = await auth_service.authenticate(
-        username=form_data.username,
+        username=username,
         password=form_data.password
     )
     

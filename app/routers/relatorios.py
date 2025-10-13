@@ -232,3 +232,57 @@ async def api_delete_object(
             db.commit()
     
     return {"success": True}
+
+
+@router.get("/cartas", response_class=HTMLResponse)
+async def relatorio_todas_cartas(
+    request: Request,
+    q: Optional[str] = Query(None, description="Filtrar por nome"),
+    status: Optional[str] = Query(None, description="Status da cartinha"),
+    user: Dict[str, Any] = Depends(require_roles(["ADMIN"])),
+    db: Session = Depends(get_db),
+):
+    """Relatório com todas as cartinhas e informações de anexos/miniaturas."""
+    repo = CartasRepository(db)
+
+    query = repo.db.query(repo.model).filter(repo.model.del_bl == False)
+    if q:
+        # filtro simples por nome contendo
+        from sqlalchemy import func
+        query = query.filter(func.unaccent(func.coalesce(repo.model.nome, ""))).filter(
+            func.unaccent(repo.model.nome).ilike(f"%{q}%")
+        )
+    if status == "disponivel":
+        query = query.filter(repo.model.status == "disponível")
+    elif status == "adotadas":
+        query = query.filter(repo.model.status == "adotada")
+    elif status == "entregues":
+        from sqlalchemy import or_
+        query = query.filter(or_(repo.model.entregue_bl == True, repo.model.status.ilike("%entregue%")))
+
+    cartas = query.order_by(repo.model.id.desc()).all()
+
+    # Estatísticas baseadas no conjunto filtrado
+    total = len(cartas)
+    sexo_m = sum(1 for c in cartas if getattr(c, 'sexo', None) == 'M')
+    sexo_f = sum(1 for c in cartas if getattr(c, 'sexo', None) == 'F')
+    status_counts: Dict[str, int] = {}
+    for c in cartas:
+        key = getattr(c, 'status', None) or 'indefinido'
+        status_counts[key] = status_counts.get(key, 0) + 1
+
+    return templates.TemplateResponse(
+        "relatorios/cartas.html",
+        {
+            "request": request,
+            "user": user,
+            "cartas": cartas,
+            "q": q,
+            "status_filter": status,
+            "stats": {
+                "total": total,
+                "sexo": {"M": sexo_m, "F": sexo_f},
+                "status": status_counts,
+            },
+        },
+    )

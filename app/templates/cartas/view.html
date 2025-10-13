@@ -42,7 +42,7 @@
 <div class="carta-header">
   <div class="d-flex justify-content-between align-items-center">
     <h1>Cartinha #{{ carta.id_carta }}</h1>
-    <a href="/cartas" class="btn btn-outline-secondary">Voltar para Lista</a>
+    <a href="{{ back_url or '/cartas' }}" class="btn btn-outline-secondary">Voltar para Lista</a>
   </div>
 </div>
 

@@ -11,8 +11,22 @@ Aplicativo web para gestão de cartinhas de Natal (adoção, entrega de presente
 - Relatórios:
   - Agregador de relatórios: `/relatorios/`
   - Anexos órfãos (arquivos no bucket sem referência em cartinhas): `/relatorios/anexos-orfaos`
+  - Todas as cartinhas (tabela com filtros, ordenação, ações e resumo): `/relatorios/cartas`
 - Controle de acesso por papéis (ex.: ADMIN) e dependências por rota
 - Versionamento visível: a versão do app é lida do arquivo `VERSION` e exibida no rodapé
+
+### Miniaturas e PDFs
+- Geração de miniaturas (página: `/cartas/admin/miniaturas`) com feedback via Toasts
+- Suporte a miniatura de imagens (JPEG/PNG/WEBP)
+- Suporte a PDFs: extração da primeira imagem embutida da 1ª página usando PyMuPDF (fitz) para gerar a miniatura
+- Na listagem pública:
+  - Exibe miniatura quando disponível
+  - Para PDFs sem miniatura, exibe `static/pdf128.png`
+  - Para cartas sem anexo, exibe `static/sem-imagem128.png`
+
+### Acesso e UX
+- Botões de filtro “Adotadas” e “Presente Entregue” visíveis apenas para usuários com roles `ADMIN` ou `RH`
+- Login: se o usuário digitar apenas o usuário (sem @domínio), o cliente completa automaticamente e o backend também normaliza
 
 ## Estrutura do Projeto
 ```
@@ -62,6 +76,12 @@ MINIO_ROOT_PASSWORD=adminsecret
 LDAP_API_URL=http://auth-api.example.com
 SESSION_SECRET_KEY=mude_esta_chave_em_producao
 SESSION_MAX_AGE=86400
+
+# Domínio padrão para completar e-mails de login quando omitido pelo usuário
+LOGIN_EMAIL_DEFAULT_DOMAIN=mpgo.mp.br
+
+# Tamanho da miniatura gerada (LxA)
+THUMB_SIZE=200x300
 ```
 
 ## Migrações de Banco
@@ -117,6 +137,13 @@ pytest -q
 
 ## Docker (opcional)
 O repositório inclui `Dockerfile`. Para Compose, ajuste conforme seu ambiente (PostgreSQL/MinIO) e aponte variáveis via `.env`.
+
+### Dependências de build
+- As dependências Python são instaladas a partir de `requirements.txt` (inclui `pymupdf` para miniaturas de PDFs). Para garantir que a nova lib esteja disponível no container, reconstrua a imagem:
+```bash
+docker compose build --no-cache noel-app
+docker compose up -d noel-app
+```
 
 ---
 

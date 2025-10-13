@@ -75,6 +75,8 @@
     }
 
     async function gerar(objectName, idCarta) {
+      // Toast de início do processo para item individual
+      showToast('Gerando miniatura...', 'text-bg-info');
       const r = await fetch('/cartas/admin/miniaturas/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -110,6 +112,16 @@
     // Gerar selecionados
     document.getElementById('btnGerarSelecionados').addEventListener('click', async function () {
       const rows = Array.from(tbl.querySelectorAll('tr'));
+      const selected = rows.filter(row => {
+        const ck = row.querySelector('.ckRow');
+        return ck && ck.checked;
+      });
+      if (selected.length === 0) {
+        showToast('Nenhuma cartinha selecionada.', 'text-bg-warning');
+        return;
+      }
+      // Toast de início do processo em lote
+      showToast(`Iniciando geração de ${selected.length} miniatura(s)...`, 'text-bg-info');
       for (const row of rows) {
         const ck = row.querySelector('.ckRow');
         const btn = row.querySelector('.btnGerar');
@@ -122,6 +134,8 @@
           }
         }
       }
+      // Toast final após concluir o lote (sucesso genérico)
+      showToast('Geração de miniaturas concluída.', 'text-bg-success');
     });
 
     // Selecionar cartas sem miniatura

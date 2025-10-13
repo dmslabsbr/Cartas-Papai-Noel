@@ -74,12 +74,16 @@
         <a href="/cartas?status=disponivel" class="btn btn-outline-secondary {% if status_filter == 'disponivel' %}active{% endif %}">
           Disponíveis
         </a>
+        {# Mostrar Adotadas e Presente Entregue somente para ADMIN ou RH #}
+        {% set role_codes = user.roles|map(attribute='code')|list if user else [] %}
+        {% if 'ADMIN' in role_codes or 'RH' in role_codes %}
         <a href="/cartas?status=adotadas" class="btn btn-outline-secondary {% if status_filter == 'adotadas' %}active{% endif %}">
           Adotadas
         </a>
         <a href="/cartas?status=entregues" class="btn btn-outline-secondary {% if status_filter == 'entregues' %}active{% endif %}">
           Presente Entregue
         </a>
+        {% endif %}
         {% if user %}
         <a href="/cartas?status=minhas" class="btn btn-outline-secondary {% if status_filter == 'minhas' %}active{% endif %}">
           Minhas
@@ -108,15 +112,45 @@
       {% endif %}
       
       <div class="card-body">
-        {% if carta.urlcarta_pq %}
         <div class="text-center mb-3">
-          <img src="/cartas/miniatura/{{ carta.id_carta }}" 
-               alt="Miniatura da cartinha {{ carta.nome }}" 
-               class="img-fluid rounded" 
-               style="max-height: 120px; max-width: 100%; object-fit: cover;"
-               onerror="this.style.display='none'">
+          {% if carta.urlcarta %}
+            {% set _u = (carta.urlcarta or '')|lower %}
+            {% set _is_pdf = _u.endswith('.pdf') %}
+            {% if _is_pdf %}
+              {% if carta.urlcarta_pq %}
+                <img src="/cartas/miniatura/{{ carta.id_carta }}"
+                     alt="Miniatura do PDF da cartinha {{ carta.nome }}"
+                     class="img-fluid rounded"
+                     style="max-height: 120px; max-width: 100%; object-fit: cover;"
+                     onerror="this.onerror=null; this.src='{{ url_for('static', path='pdf128.png') }}?v={{ app_version }}';">
+              {% else %}
+                <img src="{{ url_for('static', path='pdf128.png') }}?v={{ app_version }}"
+                     alt="Anexo PDF"
+                     class="img-fluid rounded"
+                     style="max-height: 120px; max-width: 100%; object-fit: cover;">
+              {% endif %}
+            {% else %}
+              {% if carta.urlcarta_pq %}
+                <img src="/cartas/miniatura/{{ carta.id_carta }}"
+                     alt="Anexo da cartinha {{ carta.nome }}"
+                     class="img-fluid rounded"
+                     style="max-height: 120px; max-width: 100%; object-fit: cover;"
+                     onerror="this.onerror=null; this.src='{{ url_for('static', path='sem-imagem128.png') }}?v={{ app_version }}';">
+              {% else %}
+                <img src="/cartas/anexo/{{ carta.id_carta }}"
+                     alt="Anexo da cartinha {{ carta.nome }}"
+                     class="img-fluid rounded"
+                     style="max-height: 120px; max-width: 100%; object-fit: cover;"
+                     onerror="this.onerror=null; this.src='{{ url_for('static', path='sem-imagem128.png') }}?v={{ app_version }}';">
+              {% endif %}
+            {% endif %}
+          {% else %}
+            <img src="{{ url_for('static', path='sem-imagem128.png') }}?v={{ app_version }}"
+                 alt="Sem imagem"
+                 class="img-fluid rounded"
+                 style="max-height: 120px; max-width: 100%; object-fit: cover;">
+          {% endif %}
         </div>
-        {% endif %}
         <h5 class="card-title carta-nome">
           {{ carta.nome }}
           {% if carta.urlcarta %}
@@ -154,7 +188,9 @@
       <div class="card-footer bg-transparent border-top-0">
         <a href="/cartas/{{ carta.id_carta }}" class="btn btn-sm btn-outline-primary">Ver detalhes</a>
         {% if carta.urlcarta %}
-        <a href="/cartas/anexo/{{ carta.id_carta }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-info ms-2">Ver imagem</a>
+        {% set _u = (carta.urlcarta or '')|lower %}
+        {% set _is_pdf = _u.endswith('.pdf') %}
+        <a href="/cartas/anexo/{{ carta.id_carta }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-info ms-2">{{ 'Ver PDF' if _is_pdf else 'Ver imagem' }}</a>
         {% endif %}
         
         {% if carta.status == "disponível" %}

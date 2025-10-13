@@ -146,6 +146,23 @@ async def admin_cartas(
     Administração de cartinhas (apenas para administradores).
     """
     repository = CartasRepository(db)
+    # Estatísticas agregadas (apenas cartinhas não deletadas logicamente)
+    from sqlalchemy import func
+    total_ativas = repository.db.query(func.count()).select_from(repository.model).filter(
+        repository.model.del_bl == False
+    ).scalar()
+    total_m = repository.db.query(func.count()).select_from(repository.model).filter(
+        repository.model.del_bl == False,
+        repository.model.sexo == 'M'
+    ).scalar()
+    total_f = repository.db.query(func.count()).select_from(repository.model).filter(
+        repository.model.del_bl == False,
+        repository.model.sexo == 'F'
+    ).scalar()
+    status_rows = repository.db.query(repository.model.status, func.count()).filter(
+        repository.model.del_bl == False
+    ).group_by(repository.model.status).all()
+    status_counts: Dict[str, int] = { (s or 'indefinido'): int(c) for (s, c) in status_rows }
     skip = (page - 1) * per_page
     
     if q:
@@ -170,6 +187,11 @@ async def admin_cartas(
             "cartas": cartas,
             "user": user,
             "q": q,
+            "stats": {
+                "total": int(total_ativas or 0),
+                "sexo": {"M": int(total_m or 0), "F": int(total_f or 0)},
+                "status": status_counts,
+            },
             "pagination": {
                 "page": page,
                 "per_page": per_page,
@@ -267,8 +289,7 @@ async def admin_generate_thumbnail(
         raise HTTPException(status_code=400, detail="object_name é obrigatório")
 
     # Pré-verificação simples por extensão
-    if object_name.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="PDF não suportado para miniatura no momento")
+    is_pdf = object_name.lower().endswith('.pdf')
 
     # Baixar objeto original em memória
     response = None
@@ -299,20 +320,52 @@ async def admin_generate_thumbnail(
     settings = get_settings()
     thumb_w, thumb_h = _parse_thumb_size(getattr(settings, "thumb_size", "200x300"))
 
-    # Abrir como imagem (se PDF, tentar primeira página no futuro; por ora, erro)
+    # Construir thumbnail
     try:
-        try:
-            from PIL import Image  # lazy import
-        except ImportError:
-            raise HTTPException(status_code=500, detail="Dependência 'Pillow' não instalada. Execute: pip install Pillow")
-        with Image.open(io.BytesIO(data)) as im:
-            im = im.convert('RGB')
-            im.thumbnail((thumb_w, thumb_h))
-            out = io.BytesIO()
-            im.save(out, format='JPEG', quality=85)
-            out.seek(0)
+        out = io.BytesIO()
+        if is_pdf:
+            # Extrair a primeira imagem embutida da 1ª página do PDF
+            try:
+                from app.services.pdf_utils import extract_first_image_from_pdf_first_page
+            except Exception:
+                raise HTTPException(status_code=500, detail="Módulo de PDF indisponível")
+
+            try:
+                first = extract_first_image_from_pdf_first_page(data)
+            except ImportError as ie:
+                raise HTTPException(status_code=500, detail=str(ie))
+            except Exception:
+                first = None
+
+            if not first:
+                raise HTTPException(status_code=400, detail="PDF sem imagem embutida na 1ª página")
+
+            ext, img_bytes = first
+            # Redimensionar a imagem extraída com Pillow
+            try:
+                from PIL import Image  # lazy import
+            except ImportError:
+                raise HTTPException(status_code=500, detail="Dependência 'Pillow' não instalada. Execute: pip install Pillow")
+            with Image.open(io.BytesIO(img_bytes)) as im:
+                im = im.convert('RGB')
+                im.thumbnail((thumb_w, thumb_h))
+                im.save(out, format='JPEG', quality=85)
+                out.seek(0)
+        else:
+            # Fluxo padrão para imagens
+            try:
+                from PIL import Image  # lazy import
+            except ImportError:
+                raise HTTPException(status_code=500, detail="Dependência 'Pillow' não instalada. Execute: pip install Pillow")
+            with Image.open(io.BytesIO(data)) as im:
+                im = im.convert('RGB')
+                im.thumbnail((thumb_w, thumb_h))
+                im.save(out, format='JPEG', quality=85)
+                out.seek(0)
+    except HTTPException:
+        raise
     except Exception:
-        raise HTTPException(status_code=400, detail="Arquivo não é uma imagem suportada para miniatura")
+        raise HTTPException(status_code=400, detail="Falha ao gerar miniatura")
 
     thumb_name = object_name.rsplit('.', 1)[0] + "_thumb.jpg"
     client.put_object(
@@ -370,6 +423,21 @@ async def view_carta(
     is_owner = bool(user) and carta.adotante_email == user.get("email")
     can_edit = is_admin or is_owner
     
+    # Determinar URL de retorno segura a partir do Referer (ou fallback)
+    try:
+        from urllib.parse import urlparse
+        referer = request.headers.get("referer") or ""
+        back_url = "/cartas"
+        if referer:
+            parsed = urlparse(referer)
+            path = parsed.path or ""
+            qs = ("?" + parsed.query) if parsed.query else ""
+            # Permitir voltar para listagens conhecidas
+            if path.startswith("/cartas") or path.startswith("/relatorios"):
+                back_url = path + qs
+    except Exception:
+        back_url = "/cartas"
+
     return templates.TemplateResponse(
         "cartas/view.html",
         {
@@ -378,7 +446,8 @@ async def view_carta(
             "user": user or {},
             "can_edit": can_edit,
             "is_admin": is_admin,
-            "is_owner": is_owner
+            "is_owner": is_owner,
+            "back_url": back_url,
         }
     )
 

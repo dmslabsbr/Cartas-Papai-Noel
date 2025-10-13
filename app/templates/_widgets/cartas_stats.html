@@ -1,0 +1,85 @@
+{% macro render_cartas_stats(stats, widget_id='cartasStats1') %}
+<style>
+  .stats-widget table.table-bordered { border-width: 2px; }
+  .stats-widget .badge + span { margin-left: .25rem; }
+  .stats-widget .chart-wrap { max-width: 520px; }
+  .stats-widget .chart-wrap canvas { max-height: 220px; }
+  .stats-widget .muted { color: #6c757d; }
+</style>
+
+<div class="stats-widget mb-4">
+  <table class="table table-bordered">
+    <thead class="table-light">
+      <tr>
+        <th colspan="4">Resumo</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Total</strong></td>
+        <td colspan="3">{{ stats.total }}</td>
+      </tr>
+      <tr>
+        <td><strong>Sexo</strong></td>
+        <td>Masculino (M): {{ stats.sexo.M }}</td>
+        <td>Feminino (F): {{ stats.sexo.F }}</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><strong>Status</strong></td>
+        <td colspan="3">
+          {% for s, count in stats.status.items() %}
+            <span class="me-3">
+              {% if s == 'disponível' %}
+              <span class="badge bg-success">Disponível</span>
+              {% elif s == 'adotada' %}
+              <span class="badge bg-primary">Adotada</span>
+              {% elif s == 'entregue' %}
+              <span class="badge bg-info">Entregue</span>
+              {% else %}
+              <span class="badge bg-secondary">{{ s }}</span>
+              {% endif %}
+              <span>{{ count }}</span>
+            </span>
+          {% endfor %}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="chart-wrap">
+    <canvas id="{{ widget_id }}_pie"></canvas>
+  </div>
+</div>
+
+<script>
+(function(){
+  try {
+    var el = document.getElementById('{{ widget_id }}_pie');
+    if (!el) return;
+    var s = {{ stats|tojson }};
+    var entries = Object.entries(s.status || {});
+    if (!entries.length) return;
+    var labels = entries.map(function(p){ return p[0]; });
+    var data = entries.map(function(p){ return p[1]; });
+    function renderChart(){
+      new Chart(el, {
+        type: 'pie',
+        data: { labels: labels, datasets: [{ data: data, backgroundColor: ['#198754','#0d6efd','#0dcaf0','#6c757d','#ffc107','#dc3545'] }] },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+    if (typeof window.Chart === 'undefined') {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+      sc.onload = renderChart;
+      document.body.appendChild(sc);
+    } else {
+      renderChart();
+    }
+  } catch(e) { console.warn('Falha ao renderizar gráfico:', e); }
+})();
+</script>
+{% endmacro %}
+
+

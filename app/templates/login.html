@@ -34,7 +34,7 @@
   </div>
   {% endif %}
   
-  <form method="post" action="/login{% if next %}?next={{ next }}{% endif %}">
+  <form id="login-form" method="post" action="/login{% if next %}?next={{ next }}{% endif %}">
     <div class="mb-3">
       <label for="username" class="form-label">Email</label>
       <input type="email" class="form-control" id="username" name="username" required>
@@ -48,4 +48,38 @@
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  var emailInput = document.getElementById('username');
+  var form = document.getElementById('login-form');
+  function normalizeEmail(value) {
+    if (!value) return value;
+    var v = String(value).trim().toLowerCase();
+    if (v && v.indexOf('@') === -1) {
+      var domain = ("{{ login_email_default_domain|default('mpgo.mp.br') }}" || 'mpgo.mp.br').replace(/^@+/, '');
+      v = v + '@' + domain;
+    }
+    return v;
+  }
+  if (emailInput) {
+    emailInput.addEventListener('blur', function() {
+      var current = emailInput.value;
+      var normalized = normalizeEmail(current);
+      if (normalized !== current) {
+        emailInput.value = normalized;
+      }
+    });
+  }
+  if (form) {
+    form.addEventListener('submit', function() {
+      if (emailInput) {
+        emailInput.value = normalizeEmail(emailInput.value);
+      }
+    });
+  }
+})();
+</script>
 {% endblock %}

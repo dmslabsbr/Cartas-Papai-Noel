@@ -49,6 +49,10 @@
   </div>
 </div>
 
+<!-- Resumo como widget reutilizável -->
+{% from "_widgets/cartas_stats.html" import render_cartas_stats %}
+{{ render_cartas_stats(stats, 'adminCartasStats') }}
+
 <!-- Toasts -->
 <div class="toast-container">
   <div id="globalToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
@@ -450,6 +454,7 @@
 {% block extra_js %}
 <script>
   document.addEventListener('DOMContentLoaded', function() {
+    // Widget já cuida do gráfico via macro
     function showToast(message, variant) {
       const toastEl = document.getElementById('globalToast');
       const toastBody = document.getElementById('globalToastBody');

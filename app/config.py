@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # Tamanho padrão da miniatura gerada (LxA), ex.: "200x300"
     thumb_size: str = Field(default="200x300", alias="THUMB_SIZE")
 
+    # Domínio padrão para completar e-mails no login quando o usuário omite o domínio
+    login_email_default_domain: str = Field(default="mpgo.mp.br", alias="LOGIN_EMAIL_DEFAULT_DOMAIN")
+
     # pydantic-settings v2 style config
     model_config = SettingsConfigDict(
         env_file=".env",

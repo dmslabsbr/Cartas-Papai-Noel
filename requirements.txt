@@ -31,6 +31,9 @@ python-multipart==0.0.9
 # Processamento de imagens
 Pillow==10.4.0
 
+# PDF (PyMuPDF) para extrair imagens de PDFs
+pymupdf==1.24.10
+
 # Dependências do FastAPI
 itsdangerous>=2.0.0  # Para sessões seguras
 starlette>=0.37.2,<0.41.0  # Framework base do FastAPI

@@ -46,13 +46,13 @@ MINIO_SECURE=true
 ### Deploy Básico
 ```bash
 # Construir e iniciar apenas a aplicação
-docker compose -f docker compose.app-only.yml up -d --build
+docker compose -f docker-compose.app-only.yml up -d --build
 
 # Verificar status
-docker compose -f docker compose.app-only.yml ps
+docker compose -f docker-compose.app-only.yml ps
 
 # Ver logs
-docker compose -f docker compose.app-only.yml logs -f noel-app
+docker compose -f docker-compose.app-only.yml logs -f noel-app
 ```
 
 ### Deploy com Script
@@ -76,25 +76,16 @@ curl http://localhost:8000/health/debug
 ### 2. Verificar Conectividade
 ```bash
 # Verificar conexão com PostgreSQL
-docker compose -f docker compose.app-only.yml exec noel-app python -c "
-from app.db import get_db
-from sqlalchemy.orm import Session
-db = next(get_db())
-print('PostgreSQL: OK' if db else 'PostgreSQL: ERRO')
-"
+docker compose -f docker-compose.app-only.yml exec noel-app python -c "from app.db import get_db; db = next(get_db()); print('PostgreSQL: OK' if db else 'PostgreSQL: ERRO')"
 
 # Verificar conexão com MinIO
-docker compose -f docker compose.app-only.yml exec noel-app python -c "
-from app.services.storage_service import StorageService
-storage = StorageService()
-print('MinIO: OK' if storage._client() else 'MinIO: ERRO')
-"
+docker compose -f docker-compose.app-only.yml exec noel-app python -c "from app.services.storage_service import StorageService; storage = StorageService(); print('MinIO: OK' if storage._client() else 'MinIO: ERRO')"
 ```
 
 ### 3. Executar Migrações
 ```bash
 # Executar migrações do banco
-docker compose -f docker compose.app-only.yml exec noel-app alembic upgrade head
+docker compose -f docker-compose.app-only.yml exec noel-app alembic upgrade head
 ```
 
 ## 🌐 Acesso
@@ -117,6 +108,7 @@ ports:
 # No arquivo .env
 THUMB_SIZE=200x300
 SESSION_MAX_AGE=43200  # 12 horas
+LOGIN_EMAIL_DEFAULT_DOMAIN=mpgo.mp.br
 ```
 
 ### 3. Volumes Personalizados
@@ -132,10 +124,10 @@ volumes:
 ### Logs em Tempo Real
 ```bash
 # Logs da aplicação
-docker compose -f docker compose.app-only.yml logs -f noel-app
+docker compose -f docker-compose.app-only.yml logs -f noel-app
 
 # Logs com timestamps
-docker compose -f docker compose.app-only.yml logs -f -t noel-app
+docker compose -f docker-compose.app-only.yml logs -f -t noel-app
 ```
 
 ### Métricas de Recursos
@@ -161,22 +153,22 @@ curl -s http://localhost:8000/health | grep -o '"status":"[^"]*"'
 ### Atualizar Aplicação
 ```bash
 # Parar aplicação
-docker compose -f docker compose.app-only.yml stop noel-app
+docker compose -f docker-compose.app-only.yml stop noel-app
 
 # Atualizar código
 git pull
 
 # Reconstruir e iniciar
-docker compose -f docker compose.app-only.yml up -d --build noel-app
+docker compose -f docker-compose.app-only.yml up -d --build noel-app
 ```
 
 ### Atualizar com Zero Downtime
 ```bash
 # Build da nova imagem
-docker compose -f docker compose.app-only.yml build noel-app
+docker compose -f docker-compose.app-only.yml build noel-app
 
 # Recriar container
-docker compose -f docker compose.app-only.yml up -d --no-deps noel-app
+docker compose -f docker-compose.app-only.yml up -d --no-deps noel-app
 ```
 
 ## 🛠️ Manutenção
@@ -187,16 +179,16 @@ docker compose -f docker compose.app-only.yml up -d --no-deps noel-app
 tar -czf noel-app-backup-$(date +%Y%m%d).tar.gz app/ alembic/ alembic.ini VERSION
 
 # Backup dos logs
-docker compose -f docker compose.app-only.yml exec noel-app tar -czf /app/logs-backup.tar.gz /app/logs
+docker compose -f docker-compose.app-only.yml exec noel-app tar -czf /app/logs-backup.tar.gz /app/logs
 ```
 
 ### Limpeza
 ```bash
 # Parar e remover container
-docker compose -f docker compose.app-only.yml down
+docker compose -f docker-compose.app-only.yml down
 
 # Remover imagem
-docker compose -f docker compose.app-only.yml down --rmi all
+docker compose -f docker-compose.app-only.yml down --rmi all
 
 # Limpar volumes
 docker volume prune
@@ -209,25 +201,25 @@ docker volume prune
 **1. Erro de conexão com PostgreSQL**
 ```bash
 # Verificar conectividade
-docker compose -f docker compose.app-only.yml exec noel-app ping seu-servidor-postgres.com
+docker compose -f docker-compose.app-only.yml exec noel-app ping seu-servidor-postgres.com
 
 # Verificar variáveis
-docker compose -f docker compose.app-only.yml exec noel-app env | grep DB_
+docker compose -f docker-compose.app-only.yml exec noel-app env | grep DB_
 ```
 
 **2. Erro de conexão com MinIO**
 ```bash
 # Verificar conectividade
-docker compose -f docker compose.app-only.yml exec noel-app curl -I https://seu-servidor-minio.com:9000
+docker compose -f docker-compose.app-only.yml exec noel-app curl -I https://seu-servidor-minio.com:9000
 
 # Verificar variáveis
-docker compose -f docker compose.app-only.yml exec noel-app env | grep MINIO_
+docker compose -f docker-compose.app-only.yml exec noel-app env | grep MINIO_
 ```
 
 **3. Aplicação não inicia**
 ```bash
 # Ver logs detalhados
-docker compose -f docker compose.app-only.yml logs noel-app
+docker compose -f docker-compose.app-only.yml logs noel-app
 
 # Verificar health check
 curl -v http://localhost:8000/health
@@ -244,10 +236,10 @@ sudo netstat -tulpn | grep :8000
 ### Logs de Debug
 ```bash
 # Logs detalhados
-docker compose -f docker compose.app-only.yml logs --tail=100 noel-app
+docker compose -f docker-compose.app-only.yml logs --tail=100 noel-app
 
 # Logs com timestamps
-docker compose -f docker compose.app-only.yml logs -f -t noel-app
+docker compose -f docker-compose.app-only.yml logs -f -t noel-app
 
 # Health check debug
 curl http://localhost:8000/health/debug
@@ -257,19 +249,19 @@ curl http://localhost:8000/health/debug
 
 ```bash
 # Status do container
-docker compose -f docker compose.app-only.yml ps
+docker compose -f docker-compose.app-only.yml ps
 
 # Logs em tempo real
-docker compose -f docker compose.app-only.yml logs -f noel-app
+docker compose -f docker-compose.app-only.yml logs -f noel-app
 
 # Entrar no container
-docker compose -f docker compose.app-only.yml exec noel-app bash
+docker compose -f docker-compose.app-only.yml exec noel-app bash
 
 # Reiniciar aplicação
-docker compose -f docker compose.app-only.yml restart noel-app
+docker compose -f docker-compose.app-only.yml restart noel-app
 
 # Parar aplicação
-docker compose -f docker compose.app-only.yml down
+docker compose -f docker-compose.app-only.yml down
 
 # Health check
 curl http://localhost:8000/health

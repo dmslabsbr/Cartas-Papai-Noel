@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Relatório - Todas as Cartinhas{% endblock %}
+
+{% block page_header %}
+{% with header_title="Relatórios", header_subtitle="Todas as cartinhas" %}
+  {% include "_header.html" %}
+{% endwith %}
+{% endblock %}
+
+{% block content %}
+<style>
+  /* Ajustes de UI do relatório */
+  td.col-adotante { font-size: 0.9rem; } /* ~2px menor em relação ao default */
+  td.col-idade { text-align: center; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable .caret { margin-left: .25rem; opacity: .6; }
+  th.sortable.active { color: #0d6efd; }
+</style>
+
+{% from "_widgets/cartas_stats.html" import render_cartas_stats %}
+
+{{ render_cartas_stats(stats, 'relatorioCartasStats') }}
+
+<div class="mb-3">
+  <a href="/relatorios" class="btn btn-outline-secondary">Voltar</a>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-sm-4">
+    <input type="text" class="form-control" name="q" placeholder="Pesquisar por nome" value="{{ q or '' }}">
+  </div>
+  <div class="col-sm-3">
+    <select name="status" class="form-select">
+      <option value="" {% if not status_filter %}selected{% endif %}>Todos os status</option>
+      <option value="disponivel" {% if status_filter == 'disponivel' %}selected{% endif %}>Disponíveis</option>
+      <option value="adotadas" {% if status_filter == 'adotadas' %}selected{% endif %}>Adotadas</option>
+      <option value="entregues" {% if status_filter == 'entregues' %}selected{% endif %}>Entregues</option>
+    </select>
+  </div>
+  <div class="col-sm-2">
+    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+  </div>
+  <div class="col-sm-3 text-end">
+    <span class="text-muted">Total: {{ cartas|length }}</span>
+  </div>
+  <div class="col-12"><hr></div>
+  <div class="col-12">
+    <div class="table-responsive">
+      <table class="table table-striped align-middle" id="tblCartas">
+        <thead>
+          <tr>
+            <th class="sortable" data-key="id">ID <span class="caret">↕</span></th>
+            <th class="sortable" data-key="nome">Nome <span class="caret">↕</span></th>
+            <th class="sortable" data-key="sexo">Sexo <span class="caret">↕</span></th>
+            <th class="sortable" data-key="idade">Idade <span class="caret">↕</span></th>
+            <th class="sortable" data-key="presente">Presente <span class="caret">↕</span></th>
+            <th class="sortable" data-key="status">Status <span class="caret">↕</span></th>
+            <th class="sortable" data-key="adotante">Adotante <span class="caret">↕</span></th>
+            <th>Anexo</th>
+            <th>Miniatura</th>
+            <th class="text-end">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in cartas %}
+          {% set has_anexo = c.urlcarta is not none and c.urlcarta|length > 0 %}
+          {% set has_thumb = c.urlcarta_pq is not none and c.urlcarta_pq|length > 0 %}
+          <tr>
+            <td>{{ c.id_carta }}</td>
+            <td class="text-break">{{ c.nome }}</td>
+            <td>{{ 'M' if c.sexo == 'M' else 'F' }}</td>
+            <td class="col-idade">{{ c.idade if c.idade is not none else '' }}</td>
+            <td class="text-break" style="max-width: 240px;">{{ c.presente }}</td>
+            <td>
+              {% if c.status == "disponível" %}
+              <span class="badge bg-success">Disponível</span>
+              {% elif c.status == "adotada" %}
+              <span class="badge bg-primary">Adotada</span>
+              {% elif c.status == "entregue" %}
+              <span class="badge bg-info">Entregue</span>
+              {% else %}
+              <span class="badge bg-secondary">{{ c.status }}</span>
+              {% endif %}
+            </td>
+            <td class="text-break col-adotante">{{ c.adotante_email or '' }}</td>
+            <td>
+              {% if has_anexo %}
+                <span class="badge text-bg-success">Sim</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Não</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if has_thumb %}
+                <span class="badge text-bg-success">Sim</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Não</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <a href="/cartas/{{ c.id_carta }}" class="btn btn-sm btn-outline-primary me-1">Ver detalhes</a>
+              {% if has_anexo %}
+              <a href="/cartas/anexo/{{ c.id_carta }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-info">Ver anexo</a>
+              {% endif %}
+              {% if has_thumb %}
+              <a href="/cartas/miniatura/{{ c.id_carta }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary ms-1">Ver miniatura</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Ordenação client-side simples por colunas selecionadas
+  (function(){
+    const table = document.getElementById('tblCartas');
+    if (!table) return;
+    const tbody = table.querySelector('tbody');
+    const getCellValue = (row, idx) => row.children[idx]?.textContent?.trim() || '';
+    const compare = (a, b, idx, key) => {
+      const va = getCellValue(a, idx);
+      const vb = getCellValue(b, idx);
+      // heurística: para ID e Idade, comparar como número; demais como texto
+      if (key === 'id' || key === 'idade') {
+        const na = parseInt(va || '0', 10);
+        const nb = parseInt(vb || '0', 10);
+        return na - nb;
+      }
+      return va.localeCompare(vb, 'pt', { sensitivity: 'base' });
+    };
+    const headers = table.querySelectorAll('th.sortable');
+    headers.forEach((th, thIndex) => {
+      let asc = true;
+      th.addEventListener('click', () => {
+        const key = th.getAttribute('data-key') || '';
+        headers.forEach(h => h.classList.remove('active'));
+        th.classList.add('active');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        rows.sort((r1, r2) => asc ? compare(r1, r2, thIndex, key) : compare(r2, r1, thIndex, key));
+        rows.forEach(r => tbody.appendChild(r));
+        asc = !asc;
+      });
+    });
+  })();
+</script>
+{% endblock %}
+
+
