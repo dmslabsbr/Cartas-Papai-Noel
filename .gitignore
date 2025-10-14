@@ -64,3 +64,6 @@ __pycache__/
 __pycache__/
 *.xlsx
 *.sql
+
+# Outros
+manual.html

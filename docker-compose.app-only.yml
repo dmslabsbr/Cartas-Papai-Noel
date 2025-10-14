@@ -10,7 +10,7 @@ services:
     container_name: noel-app
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8010:8000"
     environment:
       # Configurações da aplicação
       - ENVIRONMENT=production

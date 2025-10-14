@@ -82,6 +82,9 @@
       <h1>Cartinhas do Noel</h1>
       <p>Sistema de gerenciamento de cartinhas de Natal.</p>
       <a class="btn btn-primary" href="/cartas">Ver cartinhas</a>
+      <a class="btn btn-outline-info ms-2" href="{{ url_for('static', path='manual.html') }}?v={{ app_version }}" target="_blank" rel="noopener">
+        <i class="fa-solid fa-book-open"></i> Manual do Usuário
+      </a>
       <div class="mt-3">
         <iframe
           src="{{ url_for('static', path='info.html') }}?v={{ app_version }}"

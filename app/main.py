@@ -84,6 +84,11 @@ app.add_middleware(
     max_age=SETTINGS.session_max_age
 )
 
+# Favicon helper to avoid 404 on /favicon.ico
+@app.get("/favicon.ico", include_in_schema=False)
+async def _favicon_redirect() -> RedirectResponse:
+    return RedirectResponse(url=f"/static/favicon.ico?v={APP_VERSION}")
+
 # Restringir páginas sensíveis de listagem para ADMIN/RH quando status=adotadas|entregues
 @app.middleware("http")
 async def _restrict_sensitive_cartas(request: Request, call_next):
