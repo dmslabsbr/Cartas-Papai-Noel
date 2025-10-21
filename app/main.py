@@ -57,6 +57,31 @@ if get_settings().environment == "development":
 templates.env.globals["app_version"] = APP_VERSION
 templates.env.globals["first_name_from_user"] = first_name_from_user
 templates.env.globals["login_email_default_domain"] = getattr(SETTINGS, "login_email_default_domain", "mpgo.mp.br")
+
+# Helper central para extrair códigos de roles de forma robusta (dict ou str)
+def role_codes_of(user: Optional[Dict[str, Any]]) -> List[str]:
+    codes: List[str] = []
+    if not user:
+        return codes
+    roles_val = user.get("roles") if isinstance(user, dict) else None
+    if not roles_val:
+        # fallback: pode existir user["role_codes"] já calculado
+        rc = user.get("role_codes") if isinstance(user, dict) else None
+        return [c.upper() for c in (rc or [])]
+    for r in roles_val:
+        code: Optional[str] = None
+        if isinstance(r, dict):
+            code = r.get("code")
+        elif isinstance(r, str):
+            code = r
+        if code:
+            code_up = code.upper()
+            if code_up not in codes:
+                codes.append(code_up)
+    return codes
+
+# Expor helper aos templates
+templates.env.globals["role_codes_of"] = role_codes_of
 static_dir = Path(__file__).resolve().parent / "static"
 static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
@@ -102,8 +127,8 @@ async def _restrict_sensitive_cartas(request: Request, call_next):
                     qs = str(request.query_params) or ""
                     next_url = request.url.path + (f"?{qs}" if qs else "")
                     return RedirectResponse(url=f"/login?next={next_url}", status_code=status.HTTP_302_FOUND)
-                roles = [r.get("code") for r in (user.get("roles") or []) if isinstance(r, dict)]
-                if not any(code in ("ADMIN", "RH") for code in roles):
+                codes = role_codes_of(user)
+                if not any(code in ("ADMIN", "RH") for code in codes):
                     return RedirectResponse(url="/?error=forbidden", status_code=status.HTTP_302_FOUND)
     except Exception:
         # Em caso de qualquer erro, seguir o fluxo normal para não derrubar a requisição
