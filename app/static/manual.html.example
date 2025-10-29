@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Manual do Usuário – Cartinhas do Noel (Exemplo)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  </head>
+  <body class="bg-light">
+    <div class="container py-4">
+      <h1 class="h4 mb-3">Manual do Usuário – Exemplo</h1>
+      <p>Este é um manual padrão de exemplo. Para personalizar, substitua o arquivo <code>app/static/manual.html</code>.</p>
+      <hr>
+      <h2 class="h5">Como usar</h2>
+      <ul>
+        <li>Acesse <strong>/cartas</strong> para ver as cartinhas.</li>
+        <li>Faça login em <strong>/login</strong> para adotar.</li>
+        <li>Depois do login, clique em <em>Adotar esta cartinha</em> na página de detalhes.</li>
+      </ul>
+      <p class="text-muted mt-4">Arquivo gerado automaticamente se <code>manual.html</code> não existir.</p>
+    </div>
+  </body>
+  </html>
+
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Manual do Usuário – Cartinhas do Noel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+      body { background: #f8fafc; }
+      .hero { background: linear-gradient(135deg,#0d6efd 0%, #20c997 100%); color: #fff; border-radius: 12px; padding: 24px; }
+      .card-step { border-left: 6px solid #0d6efd; }
+      .badge-tip { background: #ffe08a; color: #7a5d00; }
+      .badge-warning-strong { background: #ff6b6b; color: #fff; }
+      .section-title i { color: #0d6efd; }
+      .emoji { font-size: 1.2rem; }
+      .icon { width: 20px; display: inline-block; text-align: center; }
+      .kbd { background: #212529; color: #fff; padding: 2px 6px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      .step-num { background:#0d6efd; color:#fff; border-radius:999px; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; margin-right:8px; }
+    </style>
+  </head>
+  <body>
+    <div class="container my-4">
+      <div class="hero mb-4">
+        <h1 class="h3 mb-2"><i class="fa-solid fa-gift"></i> Manual do Usuário – <strong>Cartinhas do Noel</strong> <span class="emoji">🎄✨</span></h1>
+        <p class="mb-0">Guia rápido para navegar, pesquisar cartinhas, adotar com responsabilidade e entregar os presentes corretamente.</p>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-12 col-lg-6">
+          <div class="card card-step shadow-sm">
+            <div class="card-body">
+              <h2 class="h5 section-title mb-3"><i class="fa-solid fa-user-astronaut"></i> Visitante (não logado) <span class="emoji">👀</span></h2>
+              <ul class="list-unstyled mb-0">
+                <li class="mb-2"><span class="icon">🏠</span> Acesse <span class="text-primary">/cartas</span> para ver a lista pública de cartinhas.</li>
+                <li class="mb-2"><span class="icon">🔍</span> Use a busca para encontrar cartinhas por <strong>nome</strong> ou <strong>presente</strong>.</li>
+                <li class="mb-2"><span class="icon">📄</span> Clique em <span class="text-primary">Ver detalhes</span> para abrir a página da cartinha.</li>
+                <li class="mb-2"><span class="icon">🖼️</span> Se houver anexo, você verá o botão <strong>Ver imagem</strong> ou <strong>Ver PDF</strong>.</li>
+                <li class="mb-2"><span class="icon">🔒</span> Para <strong>adotar</strong>, é necessário realizar o login (veja abaixo).</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card card-step shadow-sm">
+            <div class="card-body">
+              <h2 class="h5 section-title mb-3"><i class="fa-solid fa-right-to-bracket"></i> Login <span class="emoji">🔑</span></h2>
+              <div class="d-flex align-items-start mb-2"><span class="step-num">1</span><div>
+                Acesse <span class="text-primary">/login</span> e informe seu <strong>email institucional</strong> e senha.
+              </div></div>
+              <div class="d-flex align-items-start mb-2"><span class="step-num">2</span><div>
+                Se digitar apenas o usuário (ex.: <span class="kbd">joaosilva</span>), o sistema completa com <span class="badge badge-tip">@site.com.br</span> automaticamente <span class="emoji">✨</span>.
+              </div></div>
+              <div class="d-flex align-items-start"><span class="step-num">3</span><div>
+                Após autenticar, você consegue <strong>adotar</strong> cartinhas e acompanhar suas ações.
+              </div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="card card-step shadow-sm">
+            <div class="card-body">
+              <h2 class="h5 section-title mb-3"><i class="fa-solid fa-magnifying-glass"></i> Pesquisar cartinhas <span class="emoji">🔎</span></h2>
+              <p class="mb-2">Na página <strong>/cartas</strong> você pode:</p>
+              <ul class="mb-0">
+                <li class="mb-1">Filtrar por status: <span class="badge bg-secondary">Todas</span>, <span class="badge bg-success">Disponíveis</span>, <span class="badge bg-primary">Adotadas</span>, <span class="badge bg-info">Entregues</span> (alguns filtros são visíveis apenas para usuários com permissão).</li>
+                <li class="mb-1">Usar a caixa de busca para nomes/presentes.</li>
+                <li class="mb-1">Abrir a cartinha para ver detalhes e anexo (imagem ou PDF).</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card card-step shadow-sm">
+            <div class="card-body">
+              <h2 class="h5 section-title mb-3"><i class="fa-solid fa-hand-holding-heart"></i> Adotar uma cartinha <span class="emoji">💝</span></h2>
+              <div class="d-flex align-items-start mb-2"><span class="step-num">1</span><div>
+                Na página da cartinha, clique em <span class="btn btn-success btn-sm">Adotar esta cartinha</span>.
+              </div></div>
+              <div class="d-flex align-items-start mb-2"><span class="step-num">2</span><div>
+                Confirme a adoção no modal de confirmação <span class="emoji">✅</span>.
+              </div></div>
+              <div class="d-flex align-items-start"><span class="step-num">3</span><div>
+                A cartinha ficará listada em <strong>Minhas</strong> e você poderá acompanhar o status.
+              </div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card card-step shadow-sm">
+            <div class="card-body">
+              <h2 class="h5 section-title mb-3"><i class="fa-solid fa-rotate-left"></i> Desistir da adoção <span class="emoji">⚠️</span></h2>
+              <p class="mb-2">Caso realmente precise desistir:</p>
+              <ul class="mb-2">
+                <li>Abra a cartinha e clique em <span class="btn btn-warning btn-sm">Cancelar minha adoção</span>.</li>
+                <li>Confirme no modal. A cartinha volta a ficar <span class="badge bg-success">Disponível</span> para outra pessoa.</li>
+              </ul>
+              <p class="mb-0"><span class="badge badge-warning-strong"><i class="fa-solid fa-triangle-exclamation"></i> Importante</span> Se a desistência acontecer <strong>muito perto do prazo final</strong>, a criança pode <strong>não receber o presente</strong> e ficar triste <span class="emoji">😢</span>. Só desista se for inevitável.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="card card-step shadow-sm">
+            <div class="card-body">
+              <h2 class="h5 section-title mb-3"><i class="fa-solid fa-gifts"></i> Entrega do presente <span class="emoji">🎁📦</span></h2>
+              <ul class="mb-2">
+                <li>O presente deve ser <strong>embrulhado</strong> com carinho <span class="emoji">🎀</span>.</li>
+                <li>Coloque uma <strong>etiqueta</strong> com o <strong>número da carta</strong> (ex.: <span class="kbd">#123</span>) <span class="emoji">🏷️</span>.</li>
+                <li>Entregue no local indicado pela equipe de <strong>Recursos Humanos (RH)</strong> no prazo informado <span class="emoji">📅</span>.</li>
+              </ul>
+              <p class="mb-0"><i class="fa-solid fa-circle-info text-primary"></i> Em caso de dúvidas, contate o RH. Sua participação faz toda a diferença <span class="emoji">💙</span>!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center text-muted mt-4">
+        <small>
+          <i class="fa-solid fa-snowflake"></i> Obrigado por fazer parte desta corrente do bem! <span class="emoji">🤝✨</span>
+        </small>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+  </html>
+
+
