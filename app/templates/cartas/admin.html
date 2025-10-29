@@ -30,6 +30,8 @@
     right: 1rem;
     z-index: 1080;
   }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable .arrow { opacity: .4; font-size: .8em; }
 </style>
 {% endblock %}
 
@@ -86,15 +88,17 @@
 
 <!-- Tabela de cartinhas -->
 <div class="table-responsive">
-  <table class="table table-striped table-hover">
+  <table class="table table-striped table-hover" id="tblCartas">
     <thead>
       <tr>
-        <th>ID</th>
-        <th>Nome</th>
-        <th>Sexo</th>
-        <th>Presente</th>
-        <th>Status</th>
-        <th>Adotante</th>
+        <th class="sortable" data-key="id_carta">ID <span class="arrow">↕</span></th>
+        <th class="sortable" data-key="cod_carta">Cód. Carta <span class="arrow">↕</span></th>
+        <th class="sortable" data-key="ds_grupo">Grupo <span class="arrow">↕</span></th>
+        <th class="sortable" data-key="nome">Nome <span class="arrow">↕</span></th>
+        <th class="sortable" data-key="sexo">Sexo <span class="arrow">↕</span></th>
+        <th class="sortable" data-key="presente">Presente <span class="arrow">↕</span></th>
+        <th class="sortable" data-key="status">Status <span class="arrow">↕</span></th>
+        <th class="sortable" data-key="adotante_email">Adotante <span class="arrow">↕</span></th>
         <th>Ações</th>
       </tr>
     </thead>
@@ -102,6 +106,8 @@
       {% for carta in cartas %}
       <tr class="{% if carta.del_bl %}deleted-row{% endif %}">
         <td>{{ carta.id_carta }}</td>
+        <td>{{ carta.cod_carta or '-' }}</td>
+        <td>{{ carta.grupo.ds_grupo if carta.grupo else '-' }}</td>
         <td>{{ carta.nome }}</td>
         <td>{{ "M" if carta.sexo == "M" else "F" }}</td>
         <td>{{ carta.presente }}</td>
@@ -137,6 +143,8 @@
               data-status="{{ carta.status }}"
               data-observacao="{{ carta.observacao or '' }}"
               data-urlcarta="{{ carta.urlcarta or '' }}"
+              data-cod-carta="{{ carta.cod_carta or '' }}"
+              data-id-grupo-key="{{ carta.id_grupo_key or '' }}"
             >
               Editar
             </button>
@@ -269,6 +277,19 @@
             </select>
           </div>
           <div class="mb-3">
+            <label for="cod_carta" class="form-label">Código da Carta</label>
+            <input type="number" class="form-control" id="cod_carta" name="cod_carta" min="0">
+          </div>
+          <div class="mb-3">
+            <label for="id_grupo_key" class="form-label">Grupo</label>
+            <select class="form-select" id="id_grupo_key" name="id_grupo_key">
+              <option value="">- selecione -</option>
+              {% for g in grupos %}
+              <option value="{{ g.id_grupo }}">{{ g.ds_grupo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
             <label for="observacao" class="form-label">Observação</label>
             <textarea class="form-control" id="observacao" name="observacao" rows="3"></textarea>
           </div>
@@ -323,6 +344,19 @@
             <select class="form-select" id="edit_idade" name="idade">
               {% for n in range(0, 16) %}
               <option value="{{ n }}">{{ n }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="edit_cod_carta" class="form-label">Código da Carta</label>
+            <input type="number" class="form-control" id="edit_cod_carta" name="cod_carta" min="0">
+          </div>
+          <div class="mb-3">
+            <label for="edit_id_grupo_key" class="form-label">Grupo</label>
+            <select class="form-select" id="edit_id_grupo_key" name="id_grupo_key">
+              <option value="">- selecione -</option>
+              {% for g in grupos %}
+              <option value="{{ g.id_grupo }}">{{ g.ds_grupo }}</option>
               {% endfor %}
             </select>
           </div>
@@ -474,6 +508,51 @@
       return allowed.includes(file.type);
     }
 
+    // Ordenação client-side simples
+    (function enableSorting(){
+      const tbl = document.getElementById('tblCartas');
+      if (!tbl) return;
+      const getCellValue = (tr, key) => {
+        const map = {
+          id_carta: 0,
+          cod_carta: 1,
+          ds_grupo: 2,
+          nome: 3,
+          sexo: 4,
+          presente: 5,
+          status: 6,
+          adotante_email: 7,
+        };
+        const idx = map[key];
+        const td = tr.children[idx];
+        return (td && td.textContent || '').trim();
+      };
+      const compare = (key, asc) => (a, b) => {
+        const v1 = getCellValue(a, key);
+        const v2 = getCellValue(b, key);
+        const n1 = parseFloat(v1.replace(/[^0-9.-]/g,''));
+        const n2 = parseFloat(v2.replace(/[^0-9.-]/g,''));
+        const bothNum = !isNaN(n1) && !isNaN(n2) && v1 !== '' && v2 !== '';
+        if (bothNum) return asc ? n1 - n2 : n2 - n1;
+        return asc ? v1.localeCompare(v2) : v2.localeCompare(v1);
+      };
+      const thead = tbl.querySelector('thead');
+      const tbody = tbl.querySelector('tbody');
+      if (!thead || !tbody) return;
+      let currentKey = null, asc = true;
+      thead.addEventListener('click', (e) => {
+        const th = e.target.closest('th.sortable');
+        if (!th) return;
+        const key = th.getAttribute('data-key');
+        if (!key) return;
+        asc = currentKey === key ? !asc : true;
+        currentKey = key;
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        rows.sort(compare(key, asc));
+        rows.forEach(r => tbody.appendChild(r));
+      });
+    })();
+
     // Configurar modal de edição
     const editModal = document.getElementById('editCartaModal');
     if (editModal) {
@@ -488,6 +567,8 @@
         const status = button.getAttribute('data-status');
         const observacao = button.getAttribute('data-observacao');
         const urlcarta = button.getAttribute('data-urlcarta') || '';
+        const codCarta = button.getAttribute('data-cod-carta') || '';
+        const idGrupoKey = button.getAttribute('data-id-grupo-key') || '';
         
         // Preencher o formulário
         document.getElementById('edit_id').value = id;
@@ -500,6 +581,10 @@
           if (sel) sel.value = idade;
         }
         document.getElementById('edit_observacao').value = observacao;
+        const codCartaEl = document.getElementById('edit_cod_carta');
+        if (codCartaEl) codCartaEl.value = codCarta;
+        const grupoSel = document.getElementById('edit_id_grupo_key');
+        if (grupoSel) grupoSel.value = idGrupoKey;
         
         // Selecionar o sexo
         if (sexo === 'M') {
@@ -589,6 +674,8 @@
         sexo: formEl.querySelector('input[name="sexo"]:checked').value,
         presente: document.getElementById('presente').value,
         idade: parseInt(document.getElementById('idade').value, 10),
+        cod_carta: (document.getElementById('cod_carta').value || '').trim() ? parseInt(document.getElementById('cod_carta').value, 10) : null,
+        id_grupo_key: (document.getElementById('id_grupo_key').value || '').trim() ? parseInt(document.getElementById('id_grupo_key').value, 10) : null,
         observacao: document.getElementById('observacao').value || null,
       };
 
@@ -670,6 +757,12 @@
       const data = Object.fromEntries(formData.entries());
       if (data.idade !== undefined) {
         data.idade = data.idade === '' ? null : parseInt(data.idade, 10);
+      }
+      if (data.cod_carta !== undefined) {
+        data.cod_carta = data.cod_carta === '' ? null : parseInt(data.cod_carta, 10);
+      }
+      if (data.id_grupo_key !== undefined) {
+        data.id_grupo_key = data.id_grupo_key === '' ? null : parseInt(data.id_grupo_key, 10);
       }
 
       // Se marcado remover, enviar urlcarta=null

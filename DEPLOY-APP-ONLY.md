@@ -45,6 +45,12 @@ MINIO_SECURE=true
 
 ### Deploy Básico
 ```bash
+# Construir apenas a aplicação - imagem
+docker compose -f docker-compose.app-only.yml build --no-cache
+
+# Iniciar a aplicação - iniciar a imagem
+docker compose -f docker-compose.app-only.yml up -d
+
 # Construir e iniciar apenas a aplicação
 docker compose -f docker-compose.app-only.yml up -d --build
 

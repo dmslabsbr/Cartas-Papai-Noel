@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 import logging
@@ -17,6 +17,7 @@ from app.repositories import CartasRepository
 from app.repositories.icon_presente_repository import IconPresenteRepository
 from app.schemas import CartaSchema, CartaCreate, CartaUpdate, CartaAdopt
 from app.services.storage_service import StorageService
+from app.models import Grupo
 import io
 
 logger = logging.getLogger("uvicorn")
@@ -163,16 +164,33 @@ async def admin_cartas(
         repository.model.del_bl == False
     ).group_by(repository.model.status).all()
     status_counts: Dict[str, int] = { (s or 'indefinido'): int(c) for (s, c) in status_rows }
+    # Contagem por grupos (nome amigável)
+    from sqlalchemy import select
+    from app.models import Grupo
+    group_counts_rows = (
+        repository.db.query(Grupo.ds_grupo, func.count())
+        .select_from(repository.model)
+        .join(Grupo, Grupo.id_grupo == repository.model.id_grupo_key, isouter=True)
+        .filter(repository.model.del_bl == False)
+        .group_by(Grupo.ds_grupo)
+        .all()
+    )
+    group_counts: Dict[str, int] = { (g or 'Sem grupo'): int(c) for (g, c) in group_counts_rows }
     skip = (page - 1) * per_page
     
     if q:
         cartas = repository.search_cartas(q, skip=skip, limit=per_page)
         total = len(cartas)  # Simplificado para este exemplo
     else:
-        # Incluir também as cartinhas deletadas logicamente
-        cartas = repository.db.query(repository.model).order_by(
-            repository.model.id.desc()
-        ).offset(skip).limit(per_page).all()
+        # Incluir também as cartinhas deletadas logicamente e eager load grupo
+        cartas = (
+            repository.db.query(repository.model)
+            .options(joinedload(repository.model.grupo))
+            .order_by(repository.model.id.desc())
+            .offset(skip)
+            .limit(per_page)
+            .all()
+        )
         total = repository.db.query(repository.model).count()
     
     # Calcular informações de paginação
@@ -180,6 +198,10 @@ async def admin_cartas(
     has_next = page < total_pages
     has_prev = page > 1
     
+    # Carregar grupos para selects
+    grupos_rows: List[Grupo] = db.query(Grupo).order_by(Grupo.ds_grupo.asc()).all()
+    grupos: List[Dict[str, Any]] = [{"id_grupo": g.id_grupo, "ds_grupo": g.ds_grupo} for g in grupos_rows]
+
     return templates.TemplateResponse(
         "cartas/admin.html",
         {
@@ -187,10 +209,12 @@ async def admin_cartas(
             "cartas": cartas,
             "user": user,
             "q": q,
+            "grupos": grupos,
             "stats": {
                 "total": int(total_ativas or 0),
                 "sexo": {"M": int(total_m or 0), "F": int(total_f or 0)},
                 "status": status_counts,
+                "grupos": group_counts,
             },
             "pagination": {
                 "page": page,
@@ -438,6 +462,10 @@ async def view_carta(
     except Exception:
         back_url = "/cartas"
 
+    # Carregar grupos para selects
+    grupos_rows: List[Grupo] = db.query(Grupo).order_by(Grupo.ds_grupo.asc()).all()
+    grupos: List[Dict[str, Any]] = [{"id_grupo": g.id_grupo, "ds_grupo": g.ds_grupo} for g in grupos_rows]
+
     return templates.TemplateResponse(
         "cartas/view.html",
         {
@@ -448,6 +476,7 @@ async def view_carta(
             "is_admin": is_admin,
             "is_owner": is_owner,
             "back_url": back_url,
+            "grupos": grupos,
         }
     )
 

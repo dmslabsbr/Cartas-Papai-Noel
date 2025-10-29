@@ -73,10 +73,34 @@
           {% endif %}
         </p>
       </div>
+
+      <div class="carta-section">
+        <p class="carta-label">Miniatura:</p>
+        <div class="text-center">
+          {% if carta.urlcarta %}
+            {% set _u = (carta.urlcarta or '')|lower %}
+            {% set _is_pdf = _u.endswith('.pdf') %}
+            {% if carta.urlcarta_pq %}
+              <img src="/cartas/miniatura/{{ carta.id_carta }}" alt="Miniatura" class="img-fluid rounded" style="max-height: 180px; object-fit: cover;">
+            {% elif _is_pdf %}
+              <img src="{{ url_for('static', path='pdf128.png') }}?v={{ app_version }}" alt="Anexo PDF" class="img-fluid rounded" style="max-height: 180px; object-fit: cover;">
+            {% else %}
+              <img src="/cartas/anexo/{{ carta.id_carta }}" alt="Anexo" class="img-fluid rounded" style="max-height: 180px; object-fit: cover;">
+            {% endif %}
+          {% else %}
+            <img src="{{ url_for('static', path='sem-imagem128.png') }}?v={{ app_version }}" alt="Sem imagem" class="img-fluid rounded" style="max-height: 180px; object-fit: cover;">
+          {% endif %}
+        </div>
+      </div>
       
       <div class="carta-section">
         <p class="carta-label">Presente desejado:</p>
         <p class="fs-5">{{ carta.presente }}</p>
+      </div>
+
+      <div class="row carta-section">
+        <div class="col-sm-6"><span class="carta-label">Código da Carta:</span> {{ carta.cod_carta or '-' }}</div>
+        <div class="col-sm-6"><span class="carta-label">Grupo:</span> {{ carta.grupo.ds_grupo if carta.grupo else '-' }}</div>
       </div>
       
       {% if carta.observacao %}
@@ -252,6 +276,19 @@
             </select>
           </div>
           <div class="mb-3">
+            <label for="edit_cod_carta" class="form-label">Código da Carta</label>
+            <input type="number" class="form-control" id="edit_cod_carta" name="cod_carta" min="0" value="{{ carta.cod_carta or '' }}">
+          </div>
+          <div class="mb-3">
+            <label for="edit_id_grupo_key" class="form-label">Grupo</label>
+            <select class="form-select" id="edit_id_grupo_key" name="id_grupo_key">
+              <option value="">- selecione -</option>
+              {% for g in grupos %}
+              <option value="{{ g.id_grupo }}" {% if carta.id_grupo_key and carta.id_grupo_key == g.id_grupo %}selected{% endif %}>{{ g.ds_grupo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
             <label for="edit_status" class="form-label">Status</label>
             <select class="form-select" id="edit_status" name="status" required>
               <option value="disponível" {% if carta.status == "disponível" %}selected{% endif %}>Disponível</option>
@@ -315,6 +352,8 @@
       if (pendingAdoptForm) {
         const modal = bootstrap.Modal.getInstance(adoptModalEl);
         modal && modal.hide();
+        const submitBtn = pendingAdoptForm.querySelector('button[type="submit"]');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Adotando...'; }
         pendingAdoptForm.submit();
         pendingAdoptForm = null;
       }

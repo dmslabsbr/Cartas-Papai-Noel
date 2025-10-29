@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any, Union
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, func
+import sqlalchemy as sa
 from datetime import datetime
 
 from app.models import CartaDiversa, Usuario
@@ -31,6 +32,8 @@ class CartasRepository(BaseRepository[CartaDiversa, CartaSchema, CartaCreate, Ca
             presente=data["presente"],
             status=data.get("status", "disponível"),
             observacao=data.get("observacao"),
+            cod_carta=data.get("cod_carta"),
+            id_grupo_key=data.get("id_grupo_key"),
             del_bl=False,
             created_at=datetime.now(),
             updated_at=datetime.now(),
@@ -108,38 +111,40 @@ class CartasRepository(BaseRepository[CartaDiversa, CartaSchema, CartaCreate, Ca
     
     def adopt_carta(self, id_carta: int, email: str) -> Optional[CartaDiversa]:
         """
-        Marca uma cartinha como adotada por um usuário.
-        
-        Args:
-            id_carta: ID da cartinha
-            email: Email do adotante
-            
-        Returns:
-            Cartinha atualizada ou None se não encontrada ou indisponível
+        Marca uma cartinha como adotada por um usuário, de forma atômica.
+
+        Evita condições de corrida usando um UPDATE condicional que somente
+        atualiza quando a carta ainda está disponível e sem adotante.
+
+        Returns a instância atualizada ou None se alguém adotou antes.
         """
-        carta = self.get_by_id_carta(id_carta)
-        if not carta or carta.del_bl:
+        stmt = (
+            sa.update(self.model)
+            .where(
+                and_(
+                    self.model.id_carta == id_carta,
+                    self.model.del_bl == False,
+                    self.model.adotante_email.is_(None),
+                    func.lower(self.model.status) == func.lower(sa.literal("disponível")),
+                    or_(self.model.entregue_bl.is_(False), self.model.entregue_bl.is_(None)),
+                )
+            )
+            .values(
+                adotante_email=email,
+                status="adotada",
+                updated_at=datetime.now(),
+                entregue_bl=False,
+                entregue_por_email=None,
+                entregue_em=None,
+            )
+            .returning(self.model.id)
+        )
+        result = self.db.execute(stmt).first()
+        if not result:
+            self.db.rollback()
             return None
-        # Regras de negócio: só adota se disponível, sem adotante e não entregue
-        if carta.adotante_email is not None:
-            return None
-        if (carta.status or "").lower() != "disponível":
-            return None
-        if bool(getattr(carta, "entregue_bl", False)):
-            return None
-        
-        carta.adotante_email = email
-        carta.status = "adotada"
-        carta.updated_at = datetime.now()
-        # Garantir flags de entrega coerentes
-        carta.entregue_bl = False
-        carta.entregue_por_email = None
-        carta.entregue_em = None
-        
-        self.db.add(carta)
         self.db.commit()
-        self.db.refresh(carta)
-        return carta
+        return self.get_by_id_carta(id_carta)
     
     def cancel_adoption(self, id_carta: int, email: str) -> Optional[CartaDiversa]:
         """
@@ -271,7 +276,9 @@ class CartasRepository(BaseRepository[CartaDiversa, CartaSchema, CartaCreate, Ca
                 or_(
                     self.model.nome.ilike(search),
                     self.model.presente.ilike(search),
-                    self.model.observacao.ilike(search)
+                    self.model.observacao.ilike(search),
+                    # busca por cod_carta tanto texto quanto número
+                    sa.cast(self.model.cod_carta, sa.Text).ilike(search)
                 )
             )
         ).order_by(desc(self.model.id)).offset(skip).limit(limit).all()

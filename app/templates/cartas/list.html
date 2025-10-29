@@ -317,6 +317,9 @@
       if (pendingForm) {
         const modal = bootstrap.Modal.getInstance(adoptModalEl);
         modal.hide();
+        // Desabilitar botão para evitar cliques repetidos em concorrência
+        const submitBtn = pendingForm.querySelector('button[type="submit"]');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Adotando...'; }
         pendingForm.submit();
         pendingForm = null;
       }

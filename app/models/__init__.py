@@ -8,3 +8,4 @@ from .usuarios import Usuario
 from .cartas import CartaDiversa
 from .icon_presente import IconPresente
 from .auth import Role, UserRole
+from .grupo import Grupo

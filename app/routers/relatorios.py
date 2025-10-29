@@ -271,6 +271,13 @@ async def relatorio_todas_cartas(
         key = getattr(c, 'status', None) or 'indefinido'
         status_counts[key] = status_counts.get(key, 0) + 1
 
+    # Contagem por grupos (baseado no conjunto filtrado)
+    from app.models import Grupo
+    group_counts: Dict[str, int] = {}
+    for c in cartas:
+        name = c.grupo.ds_grupo if getattr(c, 'grupo', None) else 'Sem grupo'
+        group_counts[name] = group_counts.get(name, 0) + 1
+
     return templates.TemplateResponse(
         "relatorios/cartas.html",
         {
@@ -283,6 +290,7 @@ async def relatorio_todas_cartas(
                 "total": total,
                 "sexo": {"M": sexo_m, "F": sexo_f},
                 "status": status_counts,
+                "grupos": group_counts,
             },
         },
     )

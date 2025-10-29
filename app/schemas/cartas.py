@@ -25,6 +25,8 @@ class CartaBase(BaseSchema):
     status: StatusEnum = StatusEnum.DISPONIVEL
     observacao: Optional[str] = None
     idade: Optional[int] = Field(default=None, ge=0, le=15)
+    cod_carta: Optional[int] = Field(default=None, ge=0)
+    id_grupo_key: Optional[int] = Field(default=None, ge=1)
 
 class CartaCreate(CartaBase):
     """Esquema para criação de cartinhas."""
@@ -41,6 +43,8 @@ class CartaUpdate(BaseSchema):
     adotante_email: Optional[EmailStr] = None
     # Permite limpar/atualizar a referência do anexo sem apagar o arquivo
     urlcarta: Optional[str] = None
+    cod_carta: Optional[int] = Field(default=None, ge=0)
+    id_grupo_key: Optional[int] = Field(default=None, ge=1)
 
 class CartaSchema(CartaBase):
     """Esquema para representação de cartinhas."""

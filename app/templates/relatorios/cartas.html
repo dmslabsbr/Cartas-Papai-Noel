@@ -22,8 +22,12 @@
 
 {{ render_cartas_stats(stats, 'relatorioCartasStats') }}
 
-<div class="mb-3">
+<div class="mb-3 d-flex justify-content-between align-items-center">
   <a href="/relatorios" class="btn btn-outline-secondary">Voltar</a>
+  <div class="btn-group">
+    <button id="btnExportTSV" class="btn btn-outline-primary">Exportar TSV</button>
+    <button id="btnExportPDF" class="btn btn-outline-danger">Exportar PDF</button>
+  </div>
 </div>
 
 <form method="get" class="row g-2 mb-3">
@@ -51,6 +55,8 @@
         <thead>
           <tr>
             <th class="sortable" data-key="id">ID <span class="caret">↕</span></th>
+            <th class="sortable" data-key="cod_carta">Cód. Carta <span class="caret">↕</span></th>
+            <th class="sortable" data-key="grupo">Grupo <span class="caret">↕</span></th>
             <th class="sortable" data-key="nome">Nome <span class="caret">↕</span></th>
             <th class="sortable" data-key="sexo">Sexo <span class="caret">↕</span></th>
             <th class="sortable" data-key="idade">Idade <span class="caret">↕</span></th>
@@ -68,6 +74,8 @@
           {% set has_thumb = c.urlcarta_pq is not none and c.urlcarta_pq|length > 0 %}
           <tr>
             <td>{{ c.id_carta }}</td>
+            <td>{{ c.cod_carta or '' }}</td>
+            <td>{{ c.grupo.ds_grupo if c.grupo else '-' }}</td>
             <td class="text-break">{{ c.nome }}</td>
             <td>{{ 'M' if c.sexo == 'M' else 'F' }}</td>
             <td class="col-idade">{{ c.idade if c.idade is not none else '' }}</td>
@@ -128,8 +136,8 @@
     const compare = (a, b, idx, key) => {
       const va = getCellValue(a, idx);
       const vb = getCellValue(b, idx);
-      // heurística: para ID e Idade, comparar como número; demais como texto
-      if (key === 'id' || key === 'idade') {
+      // heurística: numéricas
+      if (['id','idade','cod_carta'].includes(key)) {
         const na = parseInt(va || '0', 10);
         const nb = parseInt(vb || '0', 10);
         return na - nb;
@@ -149,6 +157,44 @@
         asc = !asc;
       });
     });
+  })();
+
+  // Exportações
+  (function(){
+    function download(filename, blob){
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    }
+
+    function exportTSV(){
+      const table = document.getElementById('tblCartas');
+      const rows = Array.from(table.querySelectorAll('tr'));
+      const data = rows.map(tr => Array.from(tr.children).map(td => (td.innerText || '').replace(/\s+/g,' ').trim()));
+      const tsv = data.map(cols => cols.join('\t')).join('\n');
+      download(`relatorio_cartas_{{ app_version }}.tsv`, new Blob([tsv], {type:'text/tab-separated-values;charset=utf-8'}));
+    }
+
+    function exportPDF(){
+      // Exportação simples via print para PDF (preserva filtros/ordenação atuais)
+      const w = window.open('', '_blank');
+      const html = document.documentElement.cloneNode(true);
+      // Remover botões de ação da tabela para o PDF
+      html.querySelectorAll('#tblCartas td.text-end').forEach(el => el.remove());
+      w.document.write('<!doctype html><html>' + html.innerHTML + '</html>');
+      w.document.close();
+      w.focus();
+      w.print();
+      w.close();
+    }
+
+    const btnTSV = document.getElementById('btnExportTSV');
+    const btnPDF = document.getElementById('btnExportPDF');
+    if (btnTSV) btnTSV.addEventListener('click', function(e){ e.preventDefault(); exportTSV(); });
+    if (btnPDF) btnPDF.addEventListener('click', function(e){ e.preventDefault(); exportPDF(); });
   })();
 </script>
 {% endblock %}

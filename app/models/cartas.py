@@ -40,6 +40,10 @@ class CartaDiversa(Base):
     urlcarta_pq = Column(Text, nullable=True)
     # Idade da criança (opcional)
     idade = Column(Integer, nullable=True)
+    # Grupo da cartinha (FK para grupos.id_grupo)
+    id_grupo_key = Column(Integer, ForeignKey("public.grupos.id_grupo"), nullable=True)
+    # Código extra/identificador adicional da carta
+    cod_carta = Column(Integer, nullable=True)
     del_bl = Column(Boolean, nullable=False, default=False)
     del_time = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -61,6 +65,7 @@ class CartaDiversa(Base):
         back_populates="cartas_adotadas",
         foreign_keys="CartaDiversa.adotante_email",
     )
+    grupo = relationship("Grupo", back_populates="cartas")
     
     def __repr__(self):
         return f"<CartaDiversa(id_carta={self.id_carta}, nome='{self.nome}', status='{self.status}')>"

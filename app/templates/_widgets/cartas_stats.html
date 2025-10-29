@@ -44,11 +44,29 @@
           {% endfor %}
         </td>
       </tr>
+      <tr>
+        <td><strong>Grupos</strong></td>
+        <td colspan="3">
+          {% if stats.grupos %}
+            {% for g, count in stats.grupos.items() %}
+            <span class="me-3">
+              <span class="badge bg-dark">{{ g }}</span>
+              <span>{{ count }}</span>
+            </span>
+            {% endfor %}
+          {% else %}
+            <span class="muted">Sem dados de grupos</span>
+          {% endif %}
+        </td>
+      </tr>
     </tbody>
   </table>
 
   <div class="chart-wrap">
     <canvas id="{{ widget_id }}_pie"></canvas>
+  </div>
+  <div class="chart-wrap mt-3">
+    <canvas id="{{ widget_id }}_pie_groups"></canvas>
   </div>
 </div>
 
@@ -78,6 +96,33 @@
       renderChart();
     }
   } catch(e) { console.warn('Falha ao renderizar gráfico:', e); }
+})();
+
+(function(){
+  try {
+    var el = document.getElementById('{{ widget_id }}_pie_groups');
+    if (!el) return;
+    var s = {{ stats|tojson }};
+    var entries = Object.entries(s.grupos || {});
+    if (!entries.length) return;
+    var labels = entries.map(function(p){ return p[0]; });
+    var data = entries.map(function(p){ return p[1]; });
+    function renderChart(){
+      new Chart(el, {
+        type: 'pie',
+        data: { labels: labels, datasets: [{ data: data, backgroundColor: ['#00C853','#64DD17','#AEEA00','#FFD600','#FFEA00','#C6FF00','#76FF03','#1DE9B6','#00E676','#B2FF59'] }] },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+    if (typeof window.Chart === 'undefined') {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+      sc.onload = renderChart;
+      document.body.appendChild(sc);
+    } else {
+      renderChart();
+    }
+  } catch(e) { console.warn('Falha ao renderizar gráfico (grupos):', e); }
 })();
 </script>
 {% endmacro %}
