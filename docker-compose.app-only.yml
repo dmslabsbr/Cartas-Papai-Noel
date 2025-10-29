@@ -1,7 +1,7 @@
 version: '3.9'
 
 services:
-  # Aplicação Noel - Apenas a aplicação
+  # Aplicação Noel - Apenas a aplicação 1.0.49
   noel-app:
     build:
       context: .
@@ -17,6 +17,7 @@ services:
       - DATABASE_URL=postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
       - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
       - SESSION_MAX_AGE=86400
+      - XVER = 1.0.49
       
       # MinIO (servidor externo)
       - MINIO_ENDPOINT=${MINIO_ENDPOINT}
