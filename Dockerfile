@@ -66,13 +66,14 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # 4) SÓ AGORA COPIE O CÓDIGO DA APLICAÇÃO (invalidará APENAS esta camada)
 #    (Essa ordem é o "pulo do gato" do cache!)
 # Copiar código da aplicação
-COPY --chown=appuser:appuser app ./app
 COPY --chown=appuser:appuser alembic ./alembic
 COPY --chown=appuser:appuser alembic.ini ./
 COPY --chown=appuser:appuser VERSION ./
 COPY --chown=appuser:appuser docker/entrypoint.sh /app/entrypoint.sh
+COPY --chown=appuser:appuser app ./app
+COPY --chown=appuser:appuser VERSION ./app/VERSION
 RUN chmod +x /app/entrypoint.sh
-COPY app ./app
+#COPY app ./app
 
 
 # Criar diretórios necessários
