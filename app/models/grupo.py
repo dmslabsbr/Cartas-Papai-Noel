@@ -15,6 +15,7 @@ class Grupo(Base):
 
     id_grupo = Column(Integer, primary_key=True)
     ds_grupo = Column(Text, nullable=False)
+    cor = Column(Text, nullable=True)  # hexa, ex.: #00FF00
 
     # Relacionamentos
     cartas = relationship("CartaDiversa", back_populates="grupo", cascade="save-update")

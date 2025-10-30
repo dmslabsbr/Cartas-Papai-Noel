@@ -32,6 +32,7 @@
   }
   th.sortable { cursor: pointer; user-select: none; }
   th.sortable .arrow { opacity: .4; font-size: .8em; }
+  .badge-group { font-size: .72rem; line-height: 1; }
 </style>
 {% endblock %}
 
@@ -107,7 +108,14 @@
       <tr class="{% if carta.del_bl %}deleted-row{% endif %}">
         <td>{{ carta.id_carta }}</td>
         <td>{{ carta.cod_carta or '-' }}</td>
-        <td>{{ carta.grupo.ds_grupo if carta.grupo else '-' }}</td>
+        <td>
+          {% if carta.grupo %}
+          <span class="badge rounded-pill badge-group js-group-badge" title="Grupo"
+                data-color="{{ (carta.grupo.cor or '') if carta.grupo.cor else '' }}">
+            {{ carta.grupo.ds_grupo }}
+          </span>
+          {% else %}-{% endif %}
+        </td>
         <td>{{ carta.nome }}</td>
         <td>{{ "M" if carta.sexo == "M" else "F" }}</td>
         <td>{{ carta.presente }}</td>
@@ -500,6 +508,31 @@
       toast.show();
       return toast;
     }
+
+    function hexToRgb(hex) {
+      var h = (hex || '').trim();
+      if (!h) return null;
+      if (h[0] === '#') h = h.slice(1);
+      if (h.length === 3) { h = h.split('').map(function(c){ return c + c; }).join(''); }
+      if (h.length !== 6) return null;
+      var r = parseInt(h.slice(0,2), 16);
+      var g = parseInt(h.slice(2,4), 16);
+      var b = parseInt(h.slice(4,6), 16);
+      if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null;
+      return { r: r, g: g, b: b };
+    }
+    function idealTextColorForBg(hex) {
+      var rgb = hexToRgb(hex);
+      if (!rgb) return '#fff';
+      var brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+      return brightness > 155 ? '#000' : '#fff';
+    }
+    document.querySelectorAll('.js-group-badge[data-color]').forEach(function(el){
+      var color = (el.getAttribute('data-color') || '').trim();
+      if (!color) return;
+      el.style.backgroundColor = color;
+      el.style.color = idealTextColorForBg(color);
+    });
 
     function isAllowedFile(file) {
       if (!file) return true;

@@ -7,6 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
+      pull_policy: build
     container_name: noel-app
     restart: unless-stopped
     ports:

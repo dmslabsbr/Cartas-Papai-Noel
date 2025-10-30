@@ -63,7 +63,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     content={"detail": "Não autenticado"}
                 )
             # Se for uma requisição web, redirecionar para login
-            return RedirectResponse(url="/login?next=" + request.url.path)
+            # Importante: usar 303 See Other para forçar GET na página de login
+            # e preservar a query string do destino original
+            from fastapi import status as _status
+            path = request.url.path
+            qs = ("?" + str(request.query_params)) if str(request.query_params) else ""
+            next_value = path + qs
+            return RedirectResponse(url=f"/login?next={next_value}", status_code=_status.HTTP_303_SEE_OTHER)
         
         # Se estiver autenticado, continuar
         return await call_next(request)

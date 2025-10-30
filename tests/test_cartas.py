@@ -143,8 +143,38 @@ def test_cancel_adoption(mock_auth_user, mock_cartas_repo):
     
     response = client.post("/cartas/cancel/101", allow_redirects=False)
     assert response.status_code == 302
-    assert response.headers["location"] == "/cartas?status=minhas"
+    assert response.headers["location"].startswith("/cartas?status=minhas")
+    assert "canceled=1" in response.headers["location"]
     mock_cartas_repo.cancel_adoption.assert_called_once_with(101, "usuario@example.com")
+
+# Testes adicionados: fluxo de adoção iniciando sem login
+
+def test_unauthenticated_adopt_redirects_to_login_303():
+    """POST /cartas/adopt/{id} sem login deve redirecionar com 303 para a página de login preservando next."""
+    response = client.post("/cartas/adopt/15", allow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login?next=/cartas/adopt/15"
+
+@pytest.mark.asyncio
+async def test_login_then_adopt_via_next():
+    """Após login com next=/cartas/adopt/{id}, o servidor executa adoção e redireciona para a carta."""
+    with patch("app.services.auth_service.AuthService.authenticate") as mock_auth, \
+         patch("app.repositories.cartas_repository.CartasRepository.adopt_carta") as mock_adopt:
+        mock_auth.return_value = (True, {
+            "email": "usuario@example.com",
+            "display_name": "Usuário Teste",
+            "roles": [{"code": "USER", "description": "Usuário comum"}]
+        })
+        mock_adopt.return_value = MagicMock(id_carta=15)
+
+        response = client.post(
+            "/login?next=/cartas/adopt/15",
+            data={"username": "usuario@example.com", "password": "senha123"},
+            allow_redirects=False
+        )
+        assert response.status_code == 302
+        assert response.headers["location"] == "/cartas/15"
+        mock_adopt.assert_called_once_with(15, "usuario@example.com")
 
 # Testes para área administrativa
 def test_admin_cartas_authorized(mock_admin_user, mock_cartas_repo):

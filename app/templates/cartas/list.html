@@ -12,35 +12,20 @@
     transform: translateY(-5px);
     box-shadow: 0 10px 20px rgba(0,0,0,0.1);
   }
-  .status-badge {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-  }
-  .carta-nome {
-    font-weight: bold;
-    margin-bottom: 0.5rem;
-  }
-  .carta-presente {
-    margin-bottom: 0.5rem;
-  }
-  .attachment-indicator {
-    font-size: 0.9rem;
-  }
-  .pagination-info {
-    color: #6c757d;
-    font-size: 0.9rem;
-  }
-  .filters {
-    background-color: #f8f9fa;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    margin-bottom: 1.5rem;
-  }
+  .status-badge { position: absolute; top: 10px; right: 10px; }
+  .carta-nome { font-weight: bold; margin-bottom: 0.5rem; }
+  .carta-presente { margin-bottom: 0.5rem; }
+  .attachment-indicator { font-size: 0.9rem; }
+  .pagination-info { color: #6c757d; font-size: 0.9rem; }
+  .filters { background-color: #f8f9fa; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; }
+  #toastContainer { position: fixed; top: 1rem; right: 1rem; z-index: 1080; }
+  .badge-group { font-size: 0.72rem; line-height: 1; }
 </style>
 {% endblock %}
 
 {% block content %}
+<div id="toastContainer" aria-live="polite" aria-atomic="true"></div>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h1>Cartinhas</h1>
   
@@ -121,8 +106,7 @@
                 <img src="/cartas/miniatura/{{ carta.id_carta }}"
                      alt="Miniatura do PDF da cartinha {{ carta.nome }}"
                      class="img-fluid rounded"
-                     style="max-height: 120px; max-width: 100%; object-fit: cover;"
-                     onerror="this.onerror=null; this.src='{{ url_for('static', path='pdf128.png') }}?v={{ app_version }}';">
+                     style="max-height: 120px; max-width: 100%; object-fit: cover;">
               {% else %}
                 <img src="{{ url_for('static', path='pdf128.png') }}?v={{ app_version }}"
                      alt="Anexo PDF"
@@ -134,14 +118,12 @@
                 <img src="/cartas/miniatura/{{ carta.id_carta }}"
                      alt="Anexo da cartinha {{ carta.nome }}"
                      class="img-fluid rounded"
-                     style="max-height: 120px; max-width: 100%; object-fit: cover;"
-                     onerror="this.onerror=null; this.src='{{ url_for('static', path='sem-imagem128.png') }}?v={{ app_version }}';">
+                     style="max-height: 120px; max-width: 100%; object-fit: cover;">
               {% else %}
                 <img src="/cartas/anexo/{{ carta.id_carta }}"
                      alt="Anexo da cartinha {{ carta.nome }}"
                      class="img-fluid rounded"
-                     style="max-height: 120px; max-width: 100%; object-fit: cover;"
-                     onerror="this.onerror=null; this.src='{{ url_for('static', path='sem-imagem128.png') }}?v={{ app_version }}';">
+                     style="max-height: 120px; max-width: 100%; object-fit: cover;">
               {% endif %}
             {% endif %}
           {% else %}
@@ -155,6 +137,13 @@
           {{ carta.nome }}
           {% if carta.urlcarta %}
           <span class="badge rounded-pill text-bg-info ms-2 attachment-indicator" title="Possui anexo">💌</span>
+          {% endif %}
+          {% if carta.grupo and carta.grupo.ds_grupo %}
+          <span class="badge rounded-pill ms-2 badge-group js-group-badge"
+                title="Grupo"
+                data-color="{{ (carta.grupo.cor or '') if carta.grupo.cor else '' }}">
+            {{ carta.grupo.ds_grupo }}
+          </span>
           {% endif %}
         </h5>
         <p class="card-text carta-presente">
@@ -247,7 +236,7 @@
   </nav>
 </div>
 
-<!-- Modal de confirmação de adoção -->
+<!-- Modais de confirmação existentes -->
 <div class="modal fade" id="confirmAdoptModal" tabindex="-1" aria-labelledby="confirmAdoptLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -255,9 +244,7 @@
         <h5 class="modal-title" id="confirmAdoptLabel">Confirmar adoção</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
-      <div class="modal-body">
-        Você deseja realmente adotar esta cartinha?
-      </div>
+      <div class="modal-body">Você deseja realmente adotar esta cartinha?</div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
         <button type="button" class="btn btn-success" id="confirmAdoptBtn">Confirmar</button>
@@ -266,7 +253,6 @@
   </div>
 </div>
 
-<!-- Modal de confirmação de cancelamento de adoção -->
 <div class="modal fade" id="confirmCancelModal" tabindex="-1" aria-labelledby="confirmCancelLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -274,16 +260,14 @@
         <h5 class="modal-title" id="confirmCancelLabel">Confirmar cancelamento</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
-      <div class="modal-body">
-        Você deseja realmente cancelar a adoção desta cartinha?
-      </div>
+      <div class="modal-body">Você deseja realmente cancelar a adoção desta cartinha?</div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Não</button>
         <button type="button" class="btn btn-warning" id="confirmCancelBtn">Sim, cancelar</button>
       </div>
     </div>
   </div>
-  </div>
+</div>
 
 {% else %}
 <div class="alert alert-info">
@@ -297,7 +281,59 @@
 
 {% block extra_js %}
 <script>
+  function showToast(message, opts) {
+    var container = document.getElementById('toastContainer');
+    if (!container) return;
+    var bg = (opts && opts.bg) || 'success';
+    var customStyle = (opts && opts.style) || '';
+    var wrapper = document.createElement('div');
+    wrapper.innerHTML = `
+      <div class="toast align-items-center border-0" role="alert" aria-live="assertive" aria-atomic="true" style="${customStyle}">
+        <div class="d-flex text-white ${bg ? 'bg-' + bg : ''}">
+          <div class="toast-body">
+            ${message}
+          </div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+      </div>`;
+    var toastEl = wrapper.firstElementChild;
+    container.appendChild(toastEl);
+    var toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+    toast.show();
+  }
+
+  function hexToRgb(hex) {
+    var h = (hex || '').trim();
+    if (!h) return null;
+    if (h[0] === '#') h = h.slice(1);
+    if (h.length === 3) {
+      h = h.split('').map(function(c){ return c + c; }).join('');
+    }
+    if (h.length !== 6) return null;
+    var r = parseInt(h.slice(0,2), 16);
+    var g = parseInt(h.slice(2,4), 16);
+    var b = parseInt(h.slice(4,6), 16);
+    if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null;
+    return { r: r, g: g, b: b };
+  }
+
+  function idealTextColorForBg(hex) {
+    var rgb = hexToRgb(hex);
+    if (!rgb) return '#fff';
+    var brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+    return brightness > 155 ? '#000' : '#fff';
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
+    // Aplicar cores às badges de grupo com contraste adequado
+    document.querySelectorAll('.js-group-badge[data-color]').forEach(function(el){
+      var color = (el.getAttribute('data-color') || '').trim();
+      if (!color) return;
+      el.style.backgroundColor = color;
+      el.style.color = idealTextColorForBg(color);
+    });
+
+    // Modais existentes
     let pendingForm = null;
     const adoptModalEl = document.getElementById('confirmAdoptModal');
     const adoptConfirmBtn = document.getElementById('confirmAdoptBtn');
@@ -313,11 +349,10 @@
       });
     });
 
-    adoptConfirmBtn.addEventListener('click', function () {
+    adoptConfirmBtn && adoptConfirmBtn.addEventListener('click', function () {
       if (pendingForm) {
         const modal = bootstrap.Modal.getInstance(adoptModalEl);
-        modal.hide();
-        // Desabilitar botão para evitar cliques repetidos em concorrência
+        modal && modal.hide();
         const submitBtn = pendingForm.querySelector('button[type="submit"]');
         if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Adotando...'; }
         pendingForm.submit();
@@ -334,14 +369,30 @@
         modal.show();
       });
     });
-    cancelConfirmBtn.addEventListener('click', function () {
+    cancelConfirmBtn && cancelConfirmBtn.addEventListener('click', function () {
       if (pendingForm) {
         const modal = bootstrap.Modal.getInstance(cancelModalEl);
-        modal.hide();
+        modal && modal.hide();
         pendingForm.submit();
         pendingForm = null;
       }
     });
+
+    // Toasts de cancelamento baseado em query params
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('canceled') === '1') {
+      showToast('Adoção cancelada com sucesso.', { bg: 'danger' }); // vermelho
+      params.delete('canceled');
+      var newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+      window.history.replaceState({}, document.title, newUrl);
+    }
+    if (params.get('error') === 'cancel_failed') {
+      // roxo customizado
+      showToast('Erro ao cancelar a adoção. Tente novamente.', { bg: '', style: 'background-color:#6f42c1;border-radius:.25rem;' });
+      params.delete('error');
+      var newUrl2 = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+      window.history.replaceState({}, document.title, newUrl2);
+    }
   });
 </script>
 {% endblock %}

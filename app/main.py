@@ -24,6 +24,7 @@ from .services import AuthService
 from .dependencies import get_current_user, require_roles
 from .routers import cartas_router, relatorios_router, usuarios_router, modulos_router, permissoes_router
 from .utils.template_helpers import first_name_from_user
+from app.repositories.cartas_repository import CartasRepository
 
 
 def read_version() -> str:
@@ -175,11 +176,11 @@ async def _check_minio_ready(*, debug: bool = False) -> Union[Dict[str, Any], bo
             result["url"] = url
             async with httpx.AsyncClient(timeout=3) as client:
                 resp = await client.get(url)
-                result["status_code"] = resp.status_code
-                result["ok"] = resp.status_code == 200
-                if not result["ok"]:
-                    result["error"] = f"Unexpected status: {resp.status_code}"
-                return result
+            result["status_code"] = resp.status_code
+            result["ok"] = resp.status_code == 200
+            if not result["ok"]:
+                result["error"] = f"Unexpected status: {resp.status_code}"
+            return result
         except Exception as e:
             result["error"] = str(e)
             result["traceback"] = traceback.format_exc()
@@ -189,7 +190,7 @@ async def _check_minio_ready(*, debug: bool = False) -> Union[Dict[str, Any], bo
             url = SETTINGS.minio_endpoint.rstrip("/") + "/minio/health/ready"
             async with httpx.AsyncClient(timeout=3) as client:
                 resp = await client.get(url)
-                return resp.status_code == 200
+            return resp.status_code == 200
         except Exception:
             return False
 
@@ -255,28 +256,28 @@ async def _check_ldap_ready(*, debug: bool = False) -> Dict[str, Any]:
         base_url = SETTINGS.ldap_api_url.rstrip("/")
         async with httpx.AsyncClient(timeout=3) as client:
             resp = await client.get(base_url)
-            result["status_code"] = resp.status_code
-            if resp.status_code == 200:
-                # Try JSON first
-                version: Optional[str] = None
-                try:
-                    data = resp.json()
-                    # Common keys that might hold version info
-                    for key in ("version", "app_version", "build", "tag"):
-                        if isinstance(data, dict) and key in data and isinstance(data[key], str):
-                            version = data[key]
-                            break
-                except Exception:
-                    # Not JSON; fallback to text search
-                    text = resp.text or ""
-                    m = re.search(r"\b(\d+\.\d+\.\d+(?:[-+][\w\.]+)?)\b", text)
-                    if m:
-                        version = m.group(1)
+        result["status_code"] = resp.status_code
+        if resp.status_code == 200:
+            # Try JSON first
+            version: Optional[str] = None
+            try:
+                data = resp.json()
+                # Common keys that might hold version info
+                for key in ("version", "app_version", "build", "tag"):
+                    if isinstance(data, dict) and key in data and isinstance(data[key], str):
+                        version = data[key]
+                        break
+            except Exception:
+                # Not JSON; fallback to text search
+                text = resp.text or ""
+                m = re.search(r"\b(\d+\.\d+\.\d+(?:[-+][\w\.]+)?)\b", text)
+                if m:
+                    version = m.group(1)
 
-                result["version"] = version
-                result["ok"] = True
-            else:
-                result["error"] = f"Unexpected status: {resp.status_code}"
+            result["version"] = version
+            result["ok"] = True
+        else:
+            result["error"] = f"Unexpected status: {resp.status_code}"
     except Exception as e:
         result["error"] = str(e)
         if debug:
@@ -429,6 +430,23 @@ async def login_form(
         if success and user_data:
             # Armazenar dados do usuário na sessão
             request.session["user"] = user_data
+
+            # Se o next apontar para uma adoção via POST, executar a adoção server-side
+            # next esperado: "/cartas/adopt/{id}"
+            try:
+                m = re.fullmatch(r"/cartas/adopt/(\d+)", next_url or "")
+                if m:
+                    id_carta = int(m.group(1))
+                    repo = CartasRepository(db)
+                    carta = repo.adopt_carta(id_carta, user_data.get("email", ""))
+                    if carta:
+                        return RedirectResponse(url=f"/cartas/{id_carta}?adopted=1", status_code=status.HTTP_302_FOUND)
+                    else:
+                        return RedirectResponse(url=f"/cartas/{id_carta}?error=adopt_failed", status_code=status.HTTP_302_FOUND)
+            except Exception:
+                # Se algo falhar nessa lógica, apenas seguir o redirecionamento padrão
+                pass
+
             return RedirectResponse(url=next_url, status_code=status.HTTP_302_FOUND)
         else:
             # Falha na autenticação

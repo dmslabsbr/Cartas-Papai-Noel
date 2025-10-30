@@ -22,26 +22,38 @@
     padding: 1.5rem;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
   }
-  .carta-actions {
-    margin-top: 2rem;
-  }
-  .carta-status {
-    font-size: 1.1rem;
-  }
-  .carta-section {
-    margin-bottom: 1.5rem;
-  }
-  .carta-label {
-    font-weight: bold;
-    color: #6c757d;
+  .carta-actions { margin-top: 2rem; }
+  .carta-status { font-size: 1.1rem; }
+  .carta-section { margin-bottom: 1.5rem; }
+  .carta-label { font-weight: bold; color: #6c757d; }
+  .badge-group { font-size: 0.78rem; line-height: 1; }
+
+  /* Toast container */
+  #toastContainer {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1080;
   }
 </style>
 {% endblock %}
 
 {% block content %}
+<!-- Toast container -->
+<div id="toastContainer" aria-live="polite" aria-atomic="true"></div>
+
 <div class="carta-header">
   <div class="d-flex justify-content-between align-items-center">
-    <h1>Cartinha #{{ carta.id_carta }}</h1>
+    <div>
+      <h1 class="d-inline">Cartinha #{{ carta.id_carta }}</h1>
+      {% if carta.grupo and carta.grupo.ds_grupo %}
+      <span class="badge rounded-pill ms-2 badge-group js-group-badge"
+            title="Grupo"
+            data-color="{{ (carta.grupo.cor or '') if carta.grupo.cor else '' }}">
+        {{ carta.grupo.ds_grupo }}
+      </span>
+      {% endif %}
+    </div>
     <a href="{{ back_url or '/cartas' }}" class="btn btn-outline-secondary">Voltar para Lista</a>
   </div>
 </div>
@@ -335,7 +347,61 @@
 
 {% block extra_js %}
 <script>
+  function showToast(message, type) {
+    var container = document.getElementById('toastContainer');
+    if (!container) return;
+    var wrapper = document.createElement('div');
+    wrapper.innerHTML = `
+      <div class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+          <div class="toast-body">
+            ${message}
+          </div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+      </div>`;
+    var toastEl = wrapper.firstElementChild;
+    container.appendChild(toastEl);
+    var toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+    toast.show();
+  }
+
+  function hexToRgb(hex) {
+    var h = (hex || '').trim();
+    if (!h) return null;
+    if (h[0] === '#') h = h.slice(1);
+    if (h.length === 3) { h = h.split('').map(function(c){ return c + c; }).join(''); }
+    if (h.length !== 6) return null;
+    var r = parseInt(h.slice(0,2), 16);
+    var g = parseInt(h.slice(2,4), 16);
+    var b = parseInt(h.slice(4,6), 16);
+    if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null;
+    return { r: r, g: g, b: b };
+  }
+  function idealTextColorForBg(hex) {
+    var rgb = hexToRgb(hex);
+    if (!rgb) return '#fff';
+    var brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+    return brightness > 155 ? '#000' : '#fff';
+  }
   document.addEventListener('DOMContentLoaded', function() {
+    // Toast baseado em query params
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('adopted') === '1') {
+      showToast('Cartinha adotada com sucesso!', 'success');
+      // Limpar o param da URL sem recarregar
+      params.delete('adopted');
+      var newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+      window.history.replaceState({}, document.title, newUrl);
+    }
+    if (params.get('error') === 'adopt_failed') {
+      showToast('Não foi possível adotar a cartinha. Tente novamente.', 'danger');
+      params.delete('error');
+      var newUrl2 = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+      window.history.replaceState({}, document.title, newUrl2);
+    }
+
+    // Modais existentes
     // Confirmação de adoção
     let pendingAdoptForm = null;
     const adoptModalEl = document.getElementById('confirmAdoptModal');
@@ -399,6 +465,14 @@
         pendingReleaseForm.submit();
         pendingReleaseForm = null;
       }
+    });
+
+    // Aplicar cor e contraste na badge do grupo
+    document.querySelectorAll('.js-group-badge[data-color]').forEach(function(el){
+      var color = (el.getAttribute('data-color') || '').trim();
+      if (!color) return;
+      el.style.backgroundColor = color;
+      el.style.color = idealTextColorForBg(color);
     });
   });
 </script>

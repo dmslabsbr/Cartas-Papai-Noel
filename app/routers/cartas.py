@@ -56,18 +56,36 @@ async def list_cartas(
     
     # Filtrar por status se especificado
     if status == "disponivel":
-        cartas = repository.get_available_cartas(skip=skip, limit=per_page)
+        cartas = (
+            repository.db.query(repository.model)
+            .options(joinedload(repository.model.grupo))
+            .filter(
+                repository.model.del_bl == False,
+                repository.model.adotante_email == None,
+                repository.model.status == "disponível"
+            )
+            .order_by(repository.model.id.desc())
+            .offset(skip).limit(per_page)
+            .all()
+        )
         total = repository.db.query(repository.model).filter(
             repository.model.del_bl == False,
             repository.model.adotante_email == None,
             repository.model.status == "disponível"
         ).count()
     elif status == "adotadas":
-        cartas = repository.db.query(repository.model).filter(
-            repository.model.del_bl == False,
-            repository.model.adotante_email != None,
-            repository.model.status == "adotada"
-        ).offset(skip).limit(per_page).all()
+        cartas = (
+            repository.db.query(repository.model)
+            .options(joinedload(repository.model.grupo))
+            .filter(
+                repository.model.del_bl == False,
+                repository.model.adotante_email != None,
+                repository.model.status == "adotada"
+            )
+            .order_by(repository.model.id.desc())
+            .offset(skip).limit(per_page)
+            .all()
+        )
         total = repository.db.query(repository.model).filter(
             repository.model.del_bl == False,
             repository.model.adotante_email != None,
@@ -75,13 +93,20 @@ async def list_cartas(
         ).count()
     elif status == "entregues":
         from sqlalchemy import or_
-        cartas = repository.db.query(repository.model).filter(
-            repository.model.del_bl == False,
-            or_(
-                repository.model.entregue_bl == True,
-                repository.model.status.ilike("%entregue%"),
-            ),
-        ).order_by(repository.model.id.desc()).offset(skip).limit(per_page).all()
+        cartas = (
+            repository.db.query(repository.model)
+            .options(joinedload(repository.model.grupo))
+            .filter(
+                repository.model.del_bl == False,
+                or_(
+                    repository.model.entregue_bl == True,
+                    repository.model.status.ilike("%entregue%"),
+                ),
+            )
+            .order_by(repository.model.id.desc())
+            .offset(skip).limit(per_page)
+            .all()
+        )
         total = repository.db.query(repository.model).filter(
             repository.model.del_bl == False,
             or_(
@@ -90,16 +115,34 @@ async def list_cartas(
             ),
         ).count()
     elif status == "minhas" and user:
-        cartas = repository.get_adopted_cartas(user["email"], skip=skip, limit=per_page)
+        cartas = (
+            repository.db.query(repository.model)
+            .options(joinedload(repository.model.grupo))
+            .filter(
+                repository.model.del_bl == False,
+                repository.model.adotante_email == user["email"]
+            )
+            .order_by(repository.model.id.desc())
+            .offset(skip).limit(per_page)
+            .all()
+        )
         total = repository.db.query(repository.model).filter(
             repository.model.del_bl == False,
             repository.model.adotante_email == user["email"]
         ).count()
     elif q:  # Pesquisa por texto
+        # Manter busca existente; grupos podem estar ausentes nesse modo
         cartas = repository.search_cartas(q, skip=skip, limit=per_page)
         total = len(cartas)  # Simplificado para este exemplo
     else:
-        cartas = repository.get_active_cartas(skip=skip, limit=per_page)
+        cartas = (
+            repository.db.query(repository.model)
+            .options(joinedload(repository.model.grupo))
+            .filter(repository.model.del_bl == False)
+            .order_by(repository.model.id.desc())
+            .offset(skip).limit(per_page)
+            .all()
+        )
         total = repository.db.query(repository.model).filter(
             repository.model.del_bl == False
         ).count()
@@ -168,14 +211,15 @@ async def admin_cartas(
     from sqlalchemy import select
     from app.models import Grupo
     group_counts_rows = (
-        repository.db.query(Grupo.ds_grupo, func.count())
+        repository.db.query(Grupo.ds_grupo, Grupo.cor, func.count())
         .select_from(repository.model)
         .join(Grupo, Grupo.id_grupo == repository.model.id_grupo_key, isouter=True)
         .filter(repository.model.del_bl == False)
-        .group_by(Grupo.ds_grupo)
+        .group_by(Grupo.ds_grupo, Grupo.cor)
         .all()
     )
-    group_counts: Dict[str, int] = { (g or 'Sem grupo'): int(c) for (g, c) in group_counts_rows }
+    group_counts: Dict[str, int] = { (g or 'Sem grupo'): int(c) for (g, _cor, c) in group_counts_rows }
+    group_colors: Dict[str, Optional[str]] = { (g or 'Sem grupo'): (_cor or None) for (g, _cor, _c) in group_counts_rows }
     skip = (page - 1) * per_page
     
     if q:
@@ -215,6 +259,7 @@ async def admin_cartas(
                 "sexo": {"M": int(total_m or 0), "F": int(total_f or 0)},
                 "status": status_counts,
                 "grupos": group_counts,
+                "grupos_colors": group_colors,
             },
             "pagination": {
                 "page": page,
@@ -493,9 +538,9 @@ async def adopt_carta(
     carta = repository.adopt_carta(id_carta, user["email"])
     
     if not carta:
-        return RedirectResponse(url="/cartas?error=adopt_failed", status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=f"/cartas/{id_carta}?error=adopt_failed", status_code=status.HTTP_302_FOUND)
     
-    return RedirectResponse(url=f"/cartas/{id_carta}", status_code=status.HTTP_302_FOUND)
+    return RedirectResponse(url=f"/cartas/{id_carta}?adopted=1", status_code=status.HTTP_302_FOUND)
 
 @router.post("/cancel/{id_carta}")
 async def cancel_adoption(
@@ -510,9 +555,9 @@ async def cancel_adoption(
     carta = repository.cancel_adoption(id_carta, user["email"])
     
     if not carta:
-        return RedirectResponse(url="/cartas?error=cancel_failed", status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url="/cartas?status=minhas&error=cancel_failed", status_code=status.HTTP_302_FOUND)
     
-    return RedirectResponse(url="/cartas?status=minhas", status_code=status.HTTP_302_FOUND)
+    return RedirectResponse(url="/cartas?status=minhas&canceled=1", status_code=status.HTTP_302_FOUND)
 
 # Rotas de liberação e entrega
 

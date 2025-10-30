@@ -1,19 +1,6 @@
-{% macro render_cartas_stats(stats, widget_id='cartasStats1') %}
-<style>
-  .stats-widget table.table-bordered { border-width: 2px; }
-  .stats-widget .badge + span { margin-left: .25rem; }
-  .stats-widget .chart-wrap { max-width: 520px; }
-  .stats-widget .chart-wrap canvas { max-height: 220px; }
-  .stats-widget .muted { color: #6c757d; }
-</style>
-
-<div class="stats-widget mb-4">
-  <table class="table table-bordered">
-    <thead class="table-light">
-      <tr>
-        <th colspan="4">Resumo</th>
-      </tr>
-    </thead>
+{% macro render_cartas_stats(stats, widget_id) %}
+<div class="cartas-stats">
+  <table class="table table-sm">
     <tbody>
       <tr>
         <td><strong>Total</strong></td>
@@ -21,26 +8,15 @@
       </tr>
       <tr>
         <td><strong>Sexo</strong></td>
-        <td>Masculino (M): {{ stats.sexo.M }}</td>
-        <td>Feminino (F): {{ stats.sexo.F }}</td>
+        <td>M: {{ stats.sexo.M }}</td>
+        <td>F: {{ stats.sexo.F }}</td>
         <td></td>
       </tr>
       <tr>
         <td><strong>Status</strong></td>
         <td colspan="3">
-          {% for s, count in stats.status.items() %}
-            <span class="me-3">
-              {% if s == 'disponível' %}
-              <span class="badge bg-success">Disponível</span>
-              {% elif s == 'adotada' %}
-              <span class="badge bg-primary">Adotada</span>
-              {% elif s == 'entregue' %}
-              <span class="badge bg-info">Entregue</span>
-              {% else %}
-              <span class="badge bg-secondary">{{ s }}</span>
-              {% endif %}
-              <span>{{ count }}</span>
-            </span>
+          {% for k, v in stats.status.items() %}
+          <span class="me-3"><span class="badge bg-secondary">{{ k }}</span> {{ v }}</span>
           {% endfor %}
         </td>
       </tr>
@@ -62,11 +38,11 @@
     </tbody>
   </table>
 
-  <div class="chart-wrap">
-    <canvas id="{{ widget_id }}_pie"></canvas>
+  <div class="chart-wrap" style="max-width:200px; max-height:200px;">
+    <canvas id="{{ widget_id }}_pie" style="width:200px; height:200px;"></canvas>
   </div>
-  <div class="chart-wrap mt-3">
-    <canvas id="{{ widget_id }}_pie_groups"></canvas>
+  <div class="chart-wrap mt-3" style="max-width:200px; max-height:200px;">
+    <canvas id="{{ widget_id }}_pie_groups" style="width:200px; height:200px;"></canvas>
   </div>
 </div>
 
@@ -84,7 +60,7 @@
       new Chart(el, {
         type: 'pie',
         data: { labels: labels, datasets: [{ data: data, backgroundColor: ['#198754','#0d6efd','#0dcaf0','#6c757d','#ffc107','#dc3545'] }] },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
       });
     }
     if (typeof window.Chart === 'undefined') {
@@ -107,11 +83,18 @@
     if (!entries.length) return;
     var labels = entries.map(function(p){ return p[0]; });
     var data = entries.map(function(p){ return p[1]; });
+    var colorMap = s.grupos_colors || {};
+    var fallback = ['#00C853','#64DD17','#AEEA00','#FFD600','#FFEA00','#C6FF00','#76FF03','#1DE9B6','#00E676','#B2FF59'];
+    var colors = labels.map(function(lbl, idx){
+      var c = colorMap && colorMap[lbl];
+      if (typeof c === 'string' && c.trim()) return c.trim();
+      return fallback[idx % fallback.length];
+    });
     function renderChart(){
       new Chart(el, {
         type: 'pie',
-        data: { labels: labels, datasets: [{ data: data, backgroundColor: ['#00C853','#64DD17','#AEEA00','#FFD600','#FFEA00','#C6FF00','#76FF03','#1DE9B6','#00E676','#B2FF59'] }] },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        data: { labels: labels, datasets: [{ data: data, backgroundColor: colors }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
       });
     }
     if (typeof window.Chart === 'undefined') {
