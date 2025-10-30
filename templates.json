@@ -1,0 +1,68 @@
+{
+    "version": "2",
+    "templates": [
+      {
+        "type": 3,
+        "title": "Noel (App Only)",
+        "description": "Somente o app FastAPI (sem banco/MinIO). Use quando já existir infraestrutura externa.",
+        "platform": "linux",
+        "logo": "https://portainer.io/images/logo_alt.png",
+        "categories": ["noel", "fastapi", "app-only"],
+        "repository": {
+          "url": "https://github.com/dmslabsbr/Cartas-Papai-Noel.git",
+          "stackfile": "docker-compose.app-only.yml"
+        },
+        "env": [
+          { "name": "ENVIRONMENT", "label": "Ambiente (production/development)", "default": "production" },
+          { "name": "DATABASE_URL", "label": "DATABASE_URL (SQLAlchemy DSN)", "default": "" },
+  
+          { "name": "MINIO_ENDPOINT", "label": "MINIO_ENDPOINT", "default": "http://127.0.0.1:9000" },
+          { "name": "MINIO_BUCKET", "label": "MINIO_BUCKET", "default": "cartas" },
+          { "name": "MINIO_ACCESS_KEY", "label": "MINIO_ACCESS_KEY (ou use ROOT_USER)", "default": "" },
+          { "name": "MINIO_SECRET_KEY", "label": "MINIO_SECRET_KEY (ou use ROOT_PASSWORD)", "default": "" },
+          { "name": "MINIO_ROOT_USER", "label": "MINIO_ROOT_USER (alternativa ao ACCESS_KEY)", "default": "" },
+          { "name": "MINIO_ROOT_PASSWORD", "label": "MINIO_ROOT_PASSWORD (alternativa ao SECRET_KEY)", "default": "" },
+  
+          { "name": "LDAP_API_URL", "label": "LDAP_API_URL (opcional)", "default": "" },
+          { "name": "SESSION_SECRET_KEY", "label": "SESSION_SECRET_KEY", "default": "" },
+          { "name": "SESSION_MAX_AGE", "label": "SESSION_MAX_AGE (segundos)", "default": "86400" },
+  
+          { "name": "LOGIN_EMAIL_DEFAULT_DOMAIN", "label": "Domínio padrão de e-mail", "default": "mpgo.mp.br" },
+          { "name": "THUMB_SIZE", "label": "Tamanho das miniaturas (LxA)", "default": "200x300" }
+        ],
+        "note": "Carregue um arquivo .env (baseie-se em env.app-only.example) ou preencha as variáveis acima."
+      },
+      {
+        "type": 3,
+        "title": "Noel (Stack Completa)",
+        "description": "App + serviços definidos em docker-compose.yml (ex.: DB/MinIO, se presentes).",
+        "platform": "linux",
+        "logo": "https://portainer.io/images/logo_alt.png",
+        "categories": ["noel", "fastapi", "stack"],
+        "repository": {
+          "url": "https://github.com/dmslabsbr/Cartas-Papai-Noel.git",
+          "stackfile": "docker-compose.yml"
+        },
+        "env": [
+          { "name": "ENVIRONMENT", "label": "Ambiente (production/development)", "default": "production" },
+          { "name": "DATABASE_URL", "label": "DATABASE_URL (SQLAlchemy DSN)", "default": "" },
+  
+          { "name": "MINIO_ENDPOINT", "label": "MINIO_ENDPOINT", "default": "http://127.0.0.1:9000" },
+          { "name": "MINIO_BUCKET", "label": "MINIO_BUCKET", "default": "cartas" },
+          { "name": "MINIO_ACCESS_KEY", "label": "MINIO_ACCESS_KEY (ou use ROOT_USER)", "default": "" },
+          { "name": "MINIO_SECRET_KEY", "label": "MINIO_SECRET_KEY (ou use ROOT_PASSWORD)", "default": "" },
+          { "name": "MINIO_ROOT_USER", "label": "MINIO_ROOT_USER (alternativa ao ACCESS_KEY)", "default": "" },
+          { "name": "MINIO_ROOT_PASSWORD", "label": "MINIO_ROOT_PASSWORD (alternativa ao SECRET_KEY)", "default": "" },
+  
+          { "name": "LDAP_API_URL", "label": "LDAP_API_URL (opcional)", "default": "" },
+          { "name": "SESSION_SECRET_KEY", "label": "SESSION_SECRET_KEY", "default": "" },
+          { "name": "SESSION_MAX_AGE", "label": "SESSION_MAX_AGE (segundos)", "default": "86400" },
+  
+          { "name": "LOGIN_EMAIL_DEFAULT_DOMAIN", "label": "Domínio padrão de e-mail", "default": "mpgo.mp.br" },
+          { "name": "THUMB_SIZE", "label": "Tamanho das miniaturas (LxA)", "default": "200x300" }
+        ],
+        "note": "Use este se quiser subir também os serviços auxiliares definidos no docker-compose.yml. Carregue um .env (baseie-se em env.example)."
+      }
+    ]
+  }
+  
