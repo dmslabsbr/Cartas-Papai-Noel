@@ -28,6 +28,8 @@
   <div class="error-message">
     {% if error == "invalid_credentials" %}
       Usuário ou senha inválidos.
+    {% elif error == "missing_fields" %}
+      Por favor, preencha todos os campos.
     {% else %}
       {{ error }}
     {% endif %}

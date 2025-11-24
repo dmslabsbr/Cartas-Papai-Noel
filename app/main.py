@@ -1,5 +1,5 @@
 from pathlib import Path
-from fastapi import FastAPI, Request, Depends, HTTPException, status
+from fastapi import FastAPI, Request, Depends, HTTPException, status, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -408,15 +408,24 @@ async def login_page(
 @app.post("/login")
 async def login_form(
     request: Request,
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    username: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ) -> RedirectResponse:
     """Processa o formulário de login."""
+    # Se os campos não foram fornecidos, redirecionar para a página de login
+    if not username or not password:
+        next_url = request.query_params.get("next", "/")
+        return RedirectResponse(
+            url=f"/login?next={next_url}&error=missing_fields",
+            status_code=status.HTTP_302_FOUND
+        )
+    
     auth_service = AuthService(db)
     next_url = request.query_params.get("next", "/")
     
     # Normalizar email: se não possuir domínio, anexar domínio padrão do .env
-    username = (form_data.username or "").strip().lower()
+    username = username.strip().lower()
     if "@" not in username and username:
         domain = getattr(SETTINGS, "login_email_default_domain", "mpgo.mp.br").lstrip("@").strip()
         username = f"{username}@{domain}"
@@ -424,7 +433,7 @@ async def login_form(
     try:
         success, user_data = await auth_service.authenticate(
             username=username,
-            password=form_data.password
+            password=password
         )
         
         if success and user_data:
