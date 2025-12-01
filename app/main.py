@@ -83,6 +83,44 @@ def role_codes_of(user: Optional[Dict[str, Any]]) -> List[str]:
 
 # Expor helper aos templates
 templates.env.globals["role_codes_of"] = role_codes_of
+
+# Criar função url_for que funciona nos templates obtendo request do contexto
+def make_url_for_with_context():
+    """Factory que cria uma função url_for que obtém request do contexto."""
+    from jinja2 import pass_context
+    
+    @pass_context  
+    def url_for_with_context(context: dict, name: str, **path_params) -> str:
+        """Função url_for que obtém request do contexto do template."""
+        from starlette.routing import NoMatchFound
+        
+        # Obter request do contexto
+        request = context.get("request")
+        if not request:
+            # Fallback: construir path manualmente
+            if name == "static":
+                path = path_params.get("path", "")
+                return f"/static/{path.lstrip('/')}"
+            return f"/{name}"
+        
+        try:
+            # Obter URL completa
+            full_url = request.url_for(name, **path_params)
+            # Retornar apenas path + query string (URL relativa)
+            result = str(full_url.path)
+            if full_url.query:
+                result += f"?{full_url.query}"
+            return result
+        except NoMatchFound:
+            # Fallback para arquivos estáticos
+            if name == "static":
+                path = path_params.get("path", "")
+                return f"/static/{path.lstrip('/')}"
+            raise
+    
+    return url_for_with_context
+
+templates.env.globals["url_for"] = make_url_for_with_context()  # Sobrescrever url_for padrão para gerar URLs relativas
 static_dir = Path(__file__).resolve().parent / "static"
 static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
